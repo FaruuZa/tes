@@ -3,7 +3,25 @@
   --panel-bg: #1e1e24;
   --accent: #d000ff;
   --text: #fff;
+  --highlight: #00e5ff;
 }
+
+/* --- 1. CUSTOM SCROLLBAR (MODERN LOOK) --- */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #151525; 
+}
+::-webkit-scrollbar-thumb {
+  background: #444; 
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #666; 
+}
+
 body {
   margin: 0;
   background: #000;
@@ -13,23 +31,220 @@ body {
   justify-content: center;
   align-items: center;
   height: 100vh;
+  height: 100dvh;
   overflow: hidden;
   user-select: none;
 }
 
-/* WRAPPER UTAMA */
 #main-wrapper {
   width: 100%;
   max-width: 450px;
   height: 100%;
   position: relative;
-  background: #333;
-  box-shadow: 0 0 50px rgba(0, 0, 0, 0.5);
+  background: #222;
+  box-shadow: 0 0 50px rgba(0, 0, 0, 0.8);
   display: flex;
-  flex-direction: column; /* PENTING */
+  flex-direction: column;
 }
 
-/* SCREEN: GAMEPLAY */
+/* --- DECK BUILDER UI POLISH --- */
+#deck-builder {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: #121218; /* Lebih gelap */
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+}
+
+#db-header {
+  padding: 20px;
+  text-align: center;
+  font-size: 24px;
+  font-weight: 800;
+  background: linear-gradient(180deg, #1e1e2e, #121218);
+  border-bottom: 1px solid #333;
+  color: var(--highlight);
+  letter-spacing: 1px;
+  text-shadow: 0 0 10px rgba(0, 229, 255, 0.3);
+}
+
+#db-search-container {
+  padding: 10px 15px;
+}
+
+#db-search {
+  width: 100%;
+  padding: 12px;
+  box-sizing: border-box;
+  background: #1e1e24;
+  border: 1px solid #444;
+  color: #fff;
+  border-radius: 8px;
+  font-size: 14px;
+  outline: none;
+  transition: 0.3s;
+}
+#db-search:focus {
+  border-color: var(--highlight);
+  box-shadow: 0 0 8px rgba(0, 229, 255, 0.2);
+}
+
+#db-controls {
+  display: flex;
+  gap: 8px;
+  padding: 0 15px 10px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+/* Tombol Filter yang lebih manis */
+.filter-btn, #sort-btn {
+  padding: 8px 12px;
+  background: #2b2b36;
+  border: none;
+  color: #888;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.filter-btn:hover, #sort-btn:hover {
+  background: #3a3a4a;
+  color: #fff;
+}
+.filter-btn.active {
+  background: var(--highlight);
+  color: #000;
+  box-shadow: 0 0 10px rgba(0, 229, 255, 0.4);
+}
+
+#db-cards {
+  flex: 1;
+  overflow-y: auto;
+  padding: 10px 15px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(75px, 1fr)); /* Sedikit lebih besar */
+  gap: 10px;
+  align-content: start;
+  padding-bottom: 20px;
+}
+
+.db-card {
+  background: linear-gradient(145deg, #2a2a35, #222);
+  border: 1px solid #444;
+  border-radius: 10px;
+  aspect-ratio: 3/4;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  cursor: pointer;
+  transition: transform 0.1s;
+}
+.db-card:active { transform: scale(0.95); }
+.db-card.selected {
+  border: 2px solid var(--highlight);
+  box-shadow: inset 0 0 15px rgba(0, 229, 255, 0.3);
+  background: #151520;
+}
+.db-card-icon { font-size: 32px; filter: drop-shadow(0 4px 2px rgba(0,0,0,0.5)); }
+.db-card-name { font-size: 10px; font-weight: 600; margin-top: 4px; color: #ddd; }
+
+/* DECK FOOTER */
+#db-footer {
+  background: #1a1a24;
+  border-top: 1px solid #333;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 15px 20px;
+  padding-bottom: 25px; /* Padding bawah lebih lega */
+  box-shadow: 0 -5px 20px rgba(0,0,0,0.5);
+  z-index: 200;
+}
+
+#db-deck-slots {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  height: 50px;
+}
+
+.deck-slot {
+  width: 40px;
+  height: 52px;
+  background: #111;
+  border: 1px dashed #444;
+  border-radius: 6px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 24px;
+  cursor: pointer;
+  position: relative;
+  transition: 0.2s;
+}
+.deck-slot:hover { border-color: #666; }
+.deck-slot.filled {
+  border: 1px solid var(--highlight);
+  background: #222;
+}
+
+.diff-btn {
+  flex: 1;
+  padding: 8px;
+  background: #222;
+  border: 1px solid #444;
+  color: #777;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+}
+.diff-btn.active {
+  background: var(--accent);
+  color: white;
+  border-color: var(--accent);
+}
+
+#db-footer-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 5px;
+}
+
+#start-btn {
+  background: #2e7d32;
+  color: white;
+  border: none;
+  padding: 12px 30px;
+  border-radius: 8px;
+  font-weight: 800;
+  font-size: 14px;
+  cursor: pointer;
+  opacity: 0.5;
+  pointer-events: none;
+  transition: 0.3s;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+#start-btn.ready {
+  opacity: 1;
+  pointer-events: auto;
+  background: linear-gradient(90deg, #43a047, #66bb6a);
+  box-shadow: 0 4px 15px rgba(76, 175, 80, 0.4);
+}
+#start-btn.ready:hover { transform: translateY(-2px); }
+
+/* --- HUD (IN-GAME) --- */
 #game-viewport {
   width: 100%;
   height: 100%;
@@ -38,273 +253,153 @@ body {
   flex-direction: column;
 }
 
-/* CANVAS: Mengisi sisa ruang di atas HUD */
 canvas {
   display: block;
   width: 100%;
-  height: 75%; /* Fix tinggi canvas 75% */
+  height: 72%; /* Sedikit dikurangi untuk memberi ruang panel bawah */
   background: #2e7d32;
-  position: absolute;
-  top: 0;
-  left: 0;
-  z-index: 0;
 }
 
-/* HUD LAYER (UI In-Game) */
+/* NEW BOTTOM PANEL LAYOUT */
 #hud-layer {
   position: absolute;
   bottom: 0;
   left: 0;
   width: 100%;
-  height: 25%; /* Fix tinggi UI 25% */
+  height: 28%; /* Naik dikit */
   z-index: 50;
-  pointer-events: none; /* Biar tembus pandang */
-  display: flex;
-  flex-direction: column;
+  pointer-events: none; 
 }
 
-/* UI DECK BUILDER */
-#deck-builder {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: #1a1a2e;
-  z-index: 100;
-  display: flex;
-  flex-direction: column;
-}
-#db-header {
-  padding: 15px;
-  text-align: center;
-  font-size: 22px;
-  font-weight: bold;
-  background: #151525;
-  border-bottom: 2px solid #333;
-  color: #00e5ff;
-}
-#db-search {
-  width: 90%;
-  padding: 10px;
-  margin: 10px auto;
-  background: #2a2a35;
-  border: 1px solid #444;
-  color: #fff;
-  border-radius: 6px;
-  display: block;
-}
-#db-controls {
-  display: flex;
-  gap: 5px;
-  padding: 0 10px 10px;
-  justify-content: center;
-  flex-wrap: wrap;
-}
-.filter-btn {
-  padding: 5px 10px;
-  background: #333;
-  border: 1px solid #555;
-  color: #aaa;
-  border-radius: 4px;
-  font-size: 11px;
-  cursor: pointer;
-}
-.filter-btn.active {
-  background: #00e5ff;
-  color: #000;
-  font-weight: bold;
-}
-#db-cards {
-  flex: 1;
-  overflow-y: auto;
-  padding: 10px;
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(65px, 1fr));
-  gap: 8px;
-  align-content: start;
-}
-.db-card {
-  background: #2a2a35;
-  border: 2px solid #444;
-  border-radius: 8px;
-  aspect-ratio: 3/4;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  position: relative;
-  cursor: pointer;
-}
-.db-card.selected {
-  border-color: #00e5ff;
-  box-shadow: 0 0 10px rgba(0, 229, 255, 0.5);
-  background: #1e1e2e;
-}
-.db-card-icon {
-  font-size: 28px;
-}
-.db-card-cost {
-  position: absolute;
-  top: -6px;
-  left: -6px;
-  width: 20px;
-  height: 20px;
-  background: #d000ff;
-  border-radius: 50%;
-  font-size: 11px;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  border: 2px solid #fff;
-  font-weight: bold;
-}
-.db-card-name {
-  font-size: 9px;
-  text-align: center;
-  margin-top: 2px;
-  width: 100%;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-#db-footer {
-  padding: 15px;
-  background: #151525;
-  border-top: 2px solid #333;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-#start-btn {
-  background: #4caf50;
-  color: white;
-  border: none;
-  padding: 10px 25px;
-  border-radius: 5px;
-  font-weight: bold;
-  cursor: pointer;
-  opacity: 0.5;
-  pointer-events: none;
-}
-#start-btn.ready {
-  opacity: 1;
-  pointer-events: auto;
-  box-shadow: 0 0 10px #4caf50;
-}
-
-/* BOTTOM PANEL (HAND CARDS) */
 #bottom-panel {
-  background: #1e1e24;
+  background: #1a1a20;
   height: 100%;
   pointer-events: auto;
-  padding: 10px;
+  padding: 10px 15px;
   box-sizing: border-box;
-  border-top: 4px solid #333;
+  border-top: 3px solid #333;
   display: flex;
   flex-direction: column;
+  gap: 8px;
+  box-shadow: 0 -5px 20px rgba(0,0,0,0.6);
 }
+
+/* Baris Info: Next Card & Elixir */
+#info-row {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  height: 35px;
+}
+
+#next-card-area {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #252530;
+  padding: 3px 10px;
+  border-radius: 20px;
+  border: 1px solid #444;
+}
+
+.next-label {
+  font-size: 10px;
+  font-weight: bold;
+  color: #888;
+  text-transform: uppercase;
+}
+
+#next-card-icon {
+  font-size: 20px;
+}
+
 #elixir-area {
-  margin-bottom: 5px;
+  flex: 1;
   position: relative;
 }
+
 .elixir-bar-bg {
-  height: 20px;
+  height: 18px;
   background: #000;
-  border-radius: 10px;
+  border-radius: 9px;
   overflow: hidden;
   border: 1px solid #555;
+  box-shadow: inset 0 0 5px rgba(0,0,0,0.8);
 }
+
 #elixir-fill {
   height: 100%;
   width: 0%;
-  background: linear-gradient(90deg, #d000ff, #9c27b0);
+  background: linear-gradient(90deg, #aa00ff, #ea80fc);
   transition: width 0.1s linear;
 }
+
 #elixir-text {
   position: absolute;
-  width: 100%;
-  text-align: center;
-  top: 0;
-  line-height: 20px;
-  font-weight: bold;
+  right: 10px;
+  top: -1px;
   font-size: 12px;
+  font-weight: bold;
+  color: #fff;
   text-shadow: 1px 1px 2px #000;
-  pointer-events: none;
 }
+
+/* Hand Cards */
 #hand-cards {
   display: flex;
-  gap: 8px;
-  height: 100%;
+  gap: 10px;
+  flex: 1; /* Isi sisa tinggi panel */
 }
+
 .hand-card {
   flex: 1;
-  background: #2b2b36;
+  background: linear-gradient(160deg, #2b2b36, #1f1f26);
   border: 2px solid #555;
-  border-radius: 6px;
+  border-radius: 8px;
   position: relative;
   cursor: pointer;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  transition: 0.1s;
+  transition: 0.15s cubic-bezier(0.175, 0.885, 0.32, 1.275); /* Bouncy effect */
+  box-shadow: 0 4px 6px rgba(0,0,0,0.3);
 }
+
+.hand-card:active { transform: scale(0.95); }
+
 .hand-card.active {
-  border-color: #00e5ff;
-  transform: translateY(-10px);
-  box-shadow: 0 0 15px #00e5ff;
+  border-color: var(--highlight);
+  transform: translateY(-8px);
+  box-shadow: 0 10px 20px rgba(0, 229, 255, 0.2);
+  background: #2a2a35;
+  z-index: 10;
 }
+
 .hand-card.disabled {
-  filter: grayscale(1);
-  opacity: 0.5;
+  filter: grayscale(1) brightness(0.6);
+  cursor: not-allowed;
+  transform: none;
 }
 
-/* MODAL INFO */
-#card-info-modal {
-  display: none;
+.card-cost {
   position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: 85%;
-  background: #1a1a2e;
-  border: 2px solid #00e5ff;
-  border-radius: 12px;
-  padding: 20px;
-  z-index: 500;
-  box-shadow: 0 0 50px #000;
-}
-#ci-header {
-  display: flex;
-  gap: 15px;
-  align-items: center;
-  margin-bottom: 15px;
-  border-bottom: 1px solid #444;
-  padding-bottom: 10px;
-}
-#ci-icon {
-  font-size: 40px;
-}
-#ci-name {
-  font-size: 18px;
-  font-weight: bold;
-  color: #00e5ff;
-}
-#ci-type {
-  font-size: 11px;
-  color: #aaa;
-  text-transform: uppercase;
-}
-.stat-row {
-  display: flex;
-  justify-content: space-between;
-  padding: 4px 0;
-  border-bottom: 1px solid #333;
-  font-size: 12px;
+  top: 4px;
+  left: 4px;
+  background: #d000ff;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  display: flex; justify-content: center; align-items: center;
+  font-size: 10px; font-weight: bold; color: white;
+  border: 1px solid white;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.5);
 }
 
-/* TOP UI */
+.card-icon { font-size: 32px; filter: drop-shadow(0 3px 3px rgba(0,0,0,0.4)); }
+.card-name { font-size: 10px; margin-top: 2px; color: #ddd; text-align: center; line-height: 1; }
+
+/* UTILS */
 #top-ui {
   position: absolute;
   top: 10px;
@@ -316,270 +411,55 @@ canvas {
   box-sizing: border-box;
   pointer-events: none;
 }
-#timer-box {
-  background: rgba(0, 0, 0, 0.6);
-  color: #fff;
-  padding: 5px 10px;
-  border-radius: 5px;
-  font-weight: bold;
-  border: 1px solid #fff;
-}
-#next-card-panel {
-  position: absolute;
-  bottom: 26%;
-  right: 10px;
+#timer-box, #bot-stats {
   background: rgba(0, 0, 0, 0.7);
-  padding: 5px;
-  border-radius: 5px;
-  border: 1px solid #555;
-  text-align: center;
-  width: 40px;
-  height: 50px;
-  z-index: 40;
-}
-.hud-label {
-  font-size: 8px;
-  color: #ccc;
-  display: block;
-}
-#next-card-icon {
-  font-size: 24px;
-  margin-top: 5px;
-}
-
-#message-overlay {
-  display: none; /* Default sembunyi */
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: rgba(0, 0, 0, 0.85);
-  z-index: 2000; /* Harus di atas segalanya */
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  color: white;
-}
-
-#message-overlay h1 {
-  font-size: 40px;
-  color: #ffeb3b;
-  text-shadow: 0 0 20px red;
-  margin-bottom: 20px;
-  text-align: center;
-}
-
-#message-overlay button {
-  padding: 15px 30px;
-  font-size: 20px;
-  background: #00e5ff;
-  border: none;
-  border-radius: 8px;
-  cursor: pointer;
-  font-weight: bold;
-  color: #000;
-}
-
-/* Sudden Death Text */
-#tiebreaker-msg {
-  display: none;
-  position: absolute;
-  top: 20%;
-  width: 100%;
-  text-align: center;
-  font-size: 32px;
-  font-weight: bold;
-  color: #ff5252;
-  text-shadow: 2px 2px 0 #fff;
-  z-index: 100;
-  animation: flash 1s infinite;
-  pointer-events: none;
-}
-
-@keyframes flash {
-  0% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.5; transform: scale(1.1); }
-  100% { opacity: 1; transform: scale(1); }
-}
-
-/* Elixir Rate Indicator */
-#elixir-rate {
-  display: none;
-  color: #d000ff;
-  font-weight: bold;
-  font-size: 18px;
-  text-shadow: 1px 1px 0 #000;
-  background: rgba(0,0,0,0.6);
-  padding: 2px 8px;
-  border-radius: 4px;
-}
-
-@keyframes shake {
-  0% { transform: translateX(0); }
-  25% { transform: translateX(-5px); }
-  50% { transform: translateX(5px); }
-  75% { transform: translateX(-5px); }
-  100% { transform: translateX(0); }
-}
-
-/* --- UPDATE style.css --- */
-
-/* 1. FIX TAMPILAN MOBILE (Ganti body rule yang lama) */
-body {
-  margin: 0;
-  background: #000;
-  font-family: "Segoe UI", sans-serif;
-  color: var(--text);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  /* Gunakan dvh agar pas di browser HP */
-  height: 100vh; 
-  height: 100dvh; 
-  overflow: hidden;
-  user-select: none;
-}
-
-/* 2. UPDATE DECK BUILDER LAYOUT */
-#deck-builder {
-  /* ...kode lama... */
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-}
-
-#db-cards {
-  flex: 1; /* Mengisi ruang sisa */
-  overflow-y: auto; /* Scrollable */
-  padding: 10px;
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(70px, 1fr));
-  gap: 8px;
-  align-content: start;
-  /* Tambahkan padding bawah agar tidak tertutup footer */
-  padding-bottom: 20px; 
-}
-
-/* 3. STYLE UNTUK DECK SLOTS (BARU) */
-#db-footer {
-  background: #151525;
-  border-top: 2px solid #333;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: 10px;
-  flex-shrink: 0; /* Jangan menyusut */
-  padding-bottom: env(safe-area-inset-bottom, 10px); /* Support iPhone X+ */
-  z-index: 200;
-}
-
-#db-deck-slots {
-  display: flex;
-  justify-content: center;
-  gap: 5px;
-  height: 40px;
-  margin-bottom: 5px;
-}
-
-.deck-slot {
-  width: 35px;
-  height: 45px;
-  background: #2a2a35;
-  border: 1px solid #444;
-  border-radius: 4px;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  font-size: 20px;
-  cursor: pointer;
-  position: relative;
-}
-
-.deck-slot.filled {
-  border-color: #00e5ff;
-  background: #1e1e2e;
-}
-
-.deck-slot img, .deck-slot div {
-  pointer-events: none;
-}
-
-.slot-cost {
-  position: absolute;
-  top: -4px;
-  right: -4px;
-  font-size: 8px;
-  background: #d000ff;
-  color: white;
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  border: 1px solid #fff;
-}
-
-#db-footer-controls {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    width: 100%;
-}
-
-/* 4. PERCANTIK MODAL INFO */
-#card-info-modal {
-  /* ...kode lama... */
-  border: 2px solid #00e5ff;
-  box-shadow: 0 0 50px rgba(0, 229, 255, 0.2);
-  max-height: 80vh;
-  overflow-y: auto;
-}
-
-#ci-header {
-  background: linear-gradient(90deg, rgba(0, 229, 255, 0.1), transparent);
-  padding: 10px;
-  border-radius: 8px;
-  margin-bottom: 10px;
-}
-
-#ci-desc {
-  font-style: italic;
-  font-size: 13px;
-  color: #ccc;
-  margin-bottom: 15px;
-  padding: 10px;
-  background: rgba(0,0,0,0.3);
-  border-left: 3px solid #00e5ff;
-  border-radius: 4px;
-}
-
-#ci-stats {
-  display: grid;
-  grid-template-columns: 1fr 1fr; /* Dua kolom */
-  gap: 8px 15px;
-}
-
-.stat-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 6px;
-  background: #2a2a35;
-  border-radius: 4px;
-  border-bottom: none; /* Reset border lama */
-  font-size: 12px;
-}
-
-.stat-label {
-  color: #aaa;
-  display: flex;
-  align-items: center;
-  gap: 5px;
-}
-
-.stat-val {
-  font-weight: bold;
   color: #fff;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-weight: bold;
+  font-size: 14px;
+  border: 1px solid rgba(255,255,255,0.2);
+  backdrop-filter: blur(4px);
 }
+
+/* --- OVERLAYS --- */
+#message-overlay {
+  display: none;
+  position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+  background: rgba(0, 0, 0, 0.9);
+  z-index: 2000;
+  flex-direction: column; justify-content: center; align-items: center;
+  backdrop-filter: blur(5px);
+}
+#message-overlay h1 { font-size: 40px; color: #ffeb3b; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 30px; }
+#message-overlay button {
+  padding: 15px 40px; font-size: 18px; background: var(--highlight);
+  border: none; border-radius: 30px; cursor: pointer; font-weight: bold;
+  box-shadow: 0 0 20px rgba(0, 229, 255, 0.4);
+  transition: 0.2s;
+}
+#message-overlay button:hover { transform: scale(1.05); }
+
+#tiebreaker-msg { display: none; position: absolute; top: 20%; width: 100%; text-align: center; font-size: 32px; font-weight: 900; color: #ff5252; text-shadow: 0 0 10px rgba(0,0,0,0.8); z-index: 100; animation: flash 1s infinite; pointer-events: none; }
+#elixir-rate { display: none; color: #d000ff; font-weight: bold; font-size: 18px; text-shadow: 1px 1px 0 #000; background: rgba(0,0,0,0.6); padding: 2px 8px; border-radius: 4px; }
+@keyframes flash { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+@keyframes shake { 0% { transform: translateX(0); } 25% { transform: translateX(-5px); } 50% { transform: translateX(5px); } 75% { transform: translateX(-5px); } 100% { transform: translateX(0); } }
+
+/* CARD INFO MODAL */
+#card-info-modal {
+  display: none;
+  position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+  width: 85%; background: #1e1e24; border: 1px solid var(--highlight);
+  border-radius: 12px; padding: 20px; z-index: 500;
+  box-shadow: 0 0 50px rgba(0,0,0,0.8);
+}
+#close-info { position: absolute; right: 15px; top: 10px; color: #aaa; cursor: pointer; font-size: 20px; }
+#ci-header { display: flex; gap: 15px; align-items: center; margin-bottom: 15px; border-bottom: 1px solid #333; padding-bottom: 10px; }
+#ci-icon { font-size: 40px; }
+#ci-name { font-size: 18px; font-weight: bold; color: var(--highlight); }
+#ci-type { font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: 1px; }
+#ci-desc { font-style: italic; font-size: 13px; color: #ccc; margin-bottom: 15px; padding: 12px; background: #252530; border-left: 3px solid var(--highlight); border-radius: 4px; line-height: 1.4; }
+#ci-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 15px; }
+.stat-row { display: flex; justify-content: space-between; align-items: center; padding: 8px; background: #2a2a35; border-radius: 6px; font-size: 12px; }
+.stat-label { color: #aaa; display: flex; align-items: center; gap: 6px; }
+.stat-val { font-weight: bold; color: #fff; }

@@ -146,9 +146,11 @@ class GameEngine {
       return;
     }
 
+    // --- LOGIKA SPAWN UNIT (DENGAN PUSH EFFECT PADA DIRI SENDIRI) ---
     if (cardData.type === "unit") {
       const count = cardData.stats.count || 1;
 
+      // Handle Spawn Effects
       if (cardData.spawnEffect) {
         const eff = cardData.spawnEffect;
         const rPx = eff.radius * CONFIG.gridSize;
@@ -167,8 +169,9 @@ class GameEngine {
       }
 
       for (let i = 0; i < count; i++) {
-        let ox = 0,
-          oy = 0;
+        let ox = 0, oy = 0;
+        
+        // Formasi Group Spawn
         if (count > 1) {
           if (count > 4) {
             const angle = ((Math.PI * 2) / count) * i;
@@ -178,11 +181,36 @@ class GameEngine {
             ox = (i - (count - 1) / 2) * 20;
           }
         }
-        const u = new Unit(x + ox, y + oy, team, key);
+
+        let spawnX = x + ox;
+        let spawnY = y + oy;
+
+        // --- NEW: Cek Overlap & Dorong Spawn Point ---
+        // Unit baru yang mengalah (terdorong) jika diletakkan di atas unit/bangunan/tower lain
+        const obstacles = [...this.units, ...this.buildings, ...this.towers];
+        for (let other of obstacles) {
+            if (other.dead) continue;
+            
+            // Hitung jarak
+            const dist = Math.hypot(spawnX - other.x, spawnY - other.y);
+            const minDist = (other.radius || 20) + 15; // 15 estimasi radius unit baru
+
+            if (dist < minDist) {
+                // Dorong spawn point keluar
+                const angle = Math.atan2(spawnY - other.y, spawnX - other.x);
+                const push = minDist - dist + 2; // +2 biar ada gap dikit
+                spawnX += Math.cos(angle) * push;
+                spawnY += Math.sin(angle) * push;
+            }
+        }
+        // ---------------------------------------------
+
+        const u = new Unit(spawnX, spawnY, team, key);
         if (team !== 0) u.deployTimer = 0;
         this.units.push(u);
       }
-    } else if (cardData.type === "building") {
+    } 
+    else if (cardData.type === "building") {
       const b = new Building(x, y, team, key);
       if (team !== 0) b.deployTimer = 0;
       this.buildings.push(b);

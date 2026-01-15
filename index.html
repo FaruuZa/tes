@@ -7,12 +7,15 @@
       content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
     />
     <title>GatauRoyale</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700;800;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css" />
   </head>
   <body>
     <div id="main-wrapper">
       <div id="deck-builder">
-        <div id="db-header">DECK BUILDER</div>
+        <div id="db-header">BATTLE DECK</div>
 
         <div id="db-search-container">
           <input
@@ -50,9 +53,10 @@
 
       <div id="game-viewport" style="display: none">
         <canvas id="gameCanvas"></canvas>
+        
         <div id="top-ui">
           <div id="bot-stats">
-            🤖 Elixir: <span id="bot-elixir-value">0</span>
+            🤖 <span id="bot-elixir-value">0</span>
           </div>
           <div id="timer-box">03:00</div>
           <div id="elixir-rate">1x</div>
@@ -66,17 +70,20 @@
         </div>
 
         <div id="hud-layer">
-          <div id="next-card-panel">
-            <span class="hud-label">NEXT</span>
-            <div id="next-card-icon"></div>
-          </div>
           <div id="bottom-panel">
-            <div id="elixir-area">
-              <div class="elixir-bar-bg">
-                <div id="elixir-fill"></div>
-                <div id="elixir-text">5</div>
-              </div>
+            <div id="info-row">
+                <div id="next-card-area">
+                    <span class="next-label">NEXT:</span>
+                    <div id="next-card-icon"></div>
+                </div>
+                <div id="elixir-area">
+                    <div class="elixir-bar-bg">
+                        <div id="elixir-fill"></div>
+                        <div id="elixir-text">5</div>
+                    </div>
+                </div>
             </div>
+            
             <div id="hand-cards"></div>
           </div>
         </div>
@@ -102,11 +109,8 @@
     <script src="js/renderer.js"></script>
     <script src="js/entity.js"></script>
 
-    <!-- AI System (TAMBAHKAN INI) -->
     <script src="js/ai/AICore.js"></script>
     <script src="js/ai/ThreatAnalyzer.js"></script>
-    <script src="js/ai/PathfindingAI.js"></script>
-    <script src="js/ai/TroopBrain.js"></script>
     <script src="js/ai/BotCommander.js"></script>
 
     <script src="js/game.js"></script>

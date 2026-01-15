@@ -161,7 +161,7 @@ class Unit extends Entity {
     this.hasSlowEffect = this.tags.includes("slow-effect");
     this.spawnZap = data.stats.spawnZap || false;
     this.radius = this.tags.includes("heavy") ? 22 : 12;
-    this.mass = this.tags.includes("heavy") ? 5.0 : 1.0; 
+    this.mass = this.tags.includes("heavy") ? 3.0 : 0.3; 
     this.lastX = x; this.lastY = y; this.stuckTimer = 0;
     this.isMoving = false; this.isAttacking = false;
     this.angle = team === 0 ? -Math.PI / 2 : Math.PI / 2;
@@ -237,22 +237,18 @@ class Unit extends Entity {
   update(game) {
     if (this.deployTimer > 0) { this.deployTimer--; return; }
     
-    // --- SPECIAL MOVEMENT: JUMP (Mega Knight style) ---
+    // --- JUMP MECHANIC ---
     if (this.jumpStats && this.target && !this.dead && !this.stunned) {
         const dist = Utils.getDist(this, this.target);
         const minJump = this.jumpStats.minRange * CONFIG.gridSize;
         const maxJump = this.jumpStats.maxRange * CONFIG.gridSize;
-        
         if (!this.isJumping && dist > 50 && dist >= minJump && dist <= maxJump) {
             this.isJumping = true; this.jumpPhase = 0; this.jumpTimer = 40; 
         }
         if (this.isJumping) {
             this.isMoving = false; this.isAttacking = false;
             if (this.jumpPhase === 0) {
-                this.jumpTimer--;
-                if (this.jumpTimer <= 0) {
-                    this.jumpPhase = 1; this.jumpStartX = this.x; this.jumpStartY = this.y; this.jumpTargetX = this.target.x; this.jumpTargetY = this.target.y;
-                }
+                this.jumpTimer--; if (this.jumpTimer <= 0) { this.jumpPhase = 1; this.jumpStartX = this.x; this.jumpStartY = this.y; this.jumpTargetX = this.target.x; this.jumpTargetY = this.target.y; }
             } else {
                 const angle = Math.atan2(this.jumpTargetY - this.y, this.jumpTargetX - this.x);
                 const jumpSpeed = this.jumpStats.speed * 2.5; 
@@ -260,7 +256,7 @@ class Unit extends Entity {
                 const distToLand = Math.hypot(this.jumpTargetX - this.x, this.jumpTargetY - this.y);
                 if (distToLand < 15) {
                     this.isJumping = false;
-                    const landRadius = 2.5 * CONFIG.gridSize; 
+                    const landRadius = 5 * CONFIG.gridSize; 
                     game.dealAreaDamage(this.x, this.y, landRadius, this.jumpStats.dmg, this.team, 'damage');
                     game.effects.push(new Effect(this.x, this.y, landRadius, "orange"));
                     this.attackTimer = 60; 
@@ -271,7 +267,15 @@ class Unit extends Entity {
     }
 
     this.updateStatus();
-    if (this.stunned > 0 || !this.hasWeapon) return;
+    
+    // --- UTAMA: Jika Stunned, STOP update logika, TAPI jalankan Collision ---
+    if (this.stunned > 0) {
+        this.resolveCollision(game);
+        return; 
+    }
+    // ------------------------------------------------------------------------
+
+    if (!this.hasWeapon) return;
 
     let speedMult = 1.0;
     let attackSpeedMult = 1.0;
@@ -281,29 +285,17 @@ class Unit extends Entity {
     if (attackSpeedMult < 0.2) attackSpeedMult = 0.2;
 
     if (this.tags.includes('charge')) {
-        // Hanya charge jika bergerak, tidak stun, tidak freeze, tidak knockback
         if (this.isMoving && !this.stunned && !this.freezeActive) {
-            this.chargeTimer++;
-            if (this.chargeTimer > 90) { // 1.5 detik lari = Charge Aktif
-                this.isCharging = true;
-            }
-        } else {
-            // Reset jika berhenti atau terkena status effect
-            this.isCharging = false;
-            this.chargeTimer = 0;
-        }
+            this.chargeTimer++; if (this.chargeTimer > 90) this.isCharging = true;
+        } else { this.isCharging = false; this.chargeTimer = 0; }
     }
-    // Jika charging, speed naik 2x (atau lebih)
-    if (this.isCharging) {
-        speedMult *= 2.0;
-    }
-
+    if (this.isCharging) speedMult *= 2.0;
+    
     let mult = speedMult * this.pushFactor; 
     this.speed = this.baseSpeed * mult;
 
     if (this.isSpawner) {
-      this.spawnTimer++;
-      if (this.spawnTimer >= this.spawnInterval) { this.spawnTimer = 0; this.spawnMinions(game); }
+      this.spawnTimer++; if (this.spawnTimer >= this.spawnInterval) { this.spawnTimer = 0; this.spawnMinions(game); }
     }
 
     this.updateTargeting(game);
@@ -315,18 +307,11 @@ class Unit extends Entity {
 
       if (dist <= reach) {
         this.isMoving = false;
-
-        if (this.isCharging) {
-            this.attackTimer = 0; // Hapus delay attackSpeed/firstHitDelay
-        }
-
+        if (this.isCharging) this.attackTimer = 0;
         if (this.attackTimer > 0) {
-            this.attackTimer -= attackSpeedMult; 
-            this.isAttacking = false;
+            this.attackTimer -= attackSpeedMult; this.isAttacking = false;
         } else {
-            this.isAttacking = true; 
-            this.doAttack(game, 1); 
-            this.attackTimer = this.hitSpeed; 
+            this.isAttacking = true; this.doAttack(game, 1); this.attackTimer = this.hitSpeed; 
         }
       } else {
         this.isAttacking = false; this.rampStage = 0; this.isMoving = true;
@@ -338,6 +323,8 @@ class Unit extends Entity {
       this.attackTimer = this.firstHitDelay;
       this.laneMovement(game);
     }
+    
+    // Physics selalu jalan
     this.resolveCollision(game);
   }
 
@@ -431,28 +418,57 @@ class Unit extends Entity {
   }
   
   resolveCollision(game) { 
+      // 1. UNIT VS UNIT & UNIT VS BUILDING
       const others = [...game.units, ...game.buildings]; 
       for (let u of others) { 
           if (u === this || u.dead) continue; 
+          
+          // Collision Filter (Air/Ground)
           const iAmAir = this.isAir; 
           const uIsAir = u.tags ? u.tags.includes("air") : false; 
           const uIsBuilding = u instanceof Building; 
-          if (iAmAir !== uIsAir && !uIsBuilding) continue; 
-          if (iAmAir && uIsBuilding) continue; 
+          
+          if (iAmAir !== uIsAir && !uIsBuilding) continue; // Air vs Ground ignore
+          if (iAmAir && uIsBuilding) continue; // Air vs Building ignore
+          
           const dist = Utils.getDist(this, u); 
           const minDist = this.radius + u.radius; 
+          
           if (dist < minDist) { 
               const angle = Math.atan2(this.y - u.y, this.x - u.x); 
               const overlap = minDist - dist; 
-              let uMass = (u instanceof Unit) ? u.mass : 9999; 
+              
+              let uMass = (u instanceof Unit) ? u.mass : 9999; // Building infinite mass
               const myMass = this.mass; 
               const totalMass = myMass + uMass; 
               const myPushRatio = uMass / totalMass; 
+              
+              // Push diri sendiri
               this.x += Math.cos(angle) * overlap * myPushRatio; 
               this.y += Math.sin(angle) * overlap * myPushRatio; 
+              
+              // Jika musuh adalah unit, kurangi push factor dia (agar tidak licin)
               if (u instanceof Unit) this.pushFactor = (myMass > uMass) ? 0.9 : 0.5; 
           } 
-      } 
+      }
+
+      // 2. UNIT VS TOWER (NEW: Ground Units Collision with Towers)
+      if (!this.isAir) {
+          for (let t of game.towers) {
+              if (t.dead) continue;
+              const dist = Utils.getDist(this, t);
+              const minDist = this.radius + t.radius; // Towers have radius defined in data.js
+              
+              if (dist < minDist) {
+                  // Push Unit AWAY from Tower (Tower is static/infinite mass)
+                  const angle = Math.atan2(this.y - t.y, this.x - t.x);
+                  const overlap = minDist - dist;
+                  
+                  this.x += Math.cos(angle) * overlap;
+                  this.y += Math.sin(angle) * overlap;
+              }
+          }
+      }
   }
 
   doAttack(game, attackMult = 1) {
