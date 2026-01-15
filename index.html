@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+    />
+    <title>GatauRoyale</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <div id="main-wrapper">
+      <div id="deck-builder">
+        <div id="db-header">DECK BUILDER</div>
+
+        <div id="db-search-container">
+          <input
+            type="text"
+            id="db-search"
+            placeholder="Cari kartu (contoh: Pekka)..."
+          />
+        </div>
+
+        <div id="db-controls">
+          <button class="filter-btn active" data-filter="all">ALL</button>
+          <button class="filter-btn" data-filter="unit">UNITS</button>
+          <button class="filter-btn" data-filter="building">BUILDINGS</button>
+          <button class="filter-btn" data-filter="spell">SPELLS</button>
+          <button id="sort-btn">COST ⬆️</button>
+        </div>
+
+        <div id="db-cards"></div>
+
+        <div id="db-footer">
+          <div id="selected-count">0 / 8 Kartu</div>
+          <button id="start-btn" disabled>BATTLE!</button>
+        </div>
+      </div>
+
+      <div id="game-viewport" style="display: none">
+        <canvas id="gameCanvas"></canvas>
+        <div id="top-ui">
+          <div id="bot-stats">
+            🤖 Elixir: <span id="bot-elixir-value">0</span>
+          </div>
+          <div id="timer-box">03:00</div>
+          <div id="elixir-rate">1x</div>
+        </div>
+
+        <div id="tiebreaker-msg">SUDDEN DEATH!</div>
+
+        <div id="message-overlay">
+          <h1 id="msg-text">GAME OVER</h1>
+          <button onclick="location.reload()">MAIN LAGI</button>
+        </div>
+
+        <div id="hud-layer">
+          <div id="next-card-panel">
+            <span class="hud-label">NEXT</span>
+            <div id="next-card-icon"></div>
+          </div>
+          <div id="bottom-panel">
+            <div id="elixir-area">
+              <div class="elixir-bar-bg">
+                <div id="elixir-fill"></div>
+                <div id="elixir-text">5</div>
+              </div>
+            </div>
+            <div id="hand-cards"></div>
+          </div>
+        </div>
+      </div>
+
+      <div id="card-info-modal">
+        <div id="close-info">✕</div>
+        <div id="ci-header">
+          <div id="ci-icon"></div>
+          <div id="ci-title-group">
+            <div id="ci-name"></div>
+            <div id="ci-type"></div>
+          </div>
+        </div>
+        <div id="ci-desc"></div>
+        <div id="ci-stats"></div>
+      </div>
+    </div>
+
+    <script src="js/data.js"></script>
+    <script src="js/utils.js"></script>
+    <script src="js/projectile.js"></script>
+    <script src="js/entity.js"></script>
+    <script src="js/game.js"></script>
+    <script src="js/ui.js"></script>
+  </body>
+</html>
