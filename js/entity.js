@@ -51,6 +51,12 @@ class Entity {
     this.target = null;
     this.isAttacking = false;
     this.attackTimer = 60; 
+
+    // Reset Charge jika kena stun
+    if (this.isCharging !== undefined) {
+        this.isCharging = false;
+        this.chargeTimer = 0;
+    }
   }
 
   applyRage(boost) {
@@ -168,6 +174,10 @@ class Unit extends Entity {
     this.jumpStartX = 0; this.jumpStartY = 0;
     this.jumpTargetX = 0; this.jumpTargetY = 0;
     this.jumpPhase = 0; 
+
+    // --- CHARGE MECHANIC ---
+    this.isCharging = false;
+    this.chargeTimer = 0;
   }
 
   takeDamage(amount) {
@@ -178,15 +188,24 @@ class Unit extends Entity {
   }
 
   doDeathEffect() {
-    this.deathEffect = null;
+    // Ambil effect dari config, bukan dari 'this.deathEffect' instance (karena bisa null)
+    const de = CARDS[this.key].deathEffect;
+    if (!de) return;
+
+    // Pastikan hanya trigger sekali
+    if (this.deathEffectTriggered) return;
+    this.deathEffectTriggered = true;
+
     if (typeof GAME !== "undefined") {
-      const de = CARDS[this.key].deathEffect;
       const radiusPx = (de.radius || 3) * CONFIG.gridSize;
 
+      // 1. Explode / Damage
       if (de.type === 'explode' || de.dmg) {
         GAME.dealAreaDamage(this.x, this.y, radiusPx, de.dmg || 0, this.team, "damage");
         GAME.effects.push(new Effect(this.x, this.y, radiusPx, "orange"));
       }
+      
+      // 2. Split / Spawn Units
       if (de.type === "split") {
         for (let i = 0; i < de.count; i++) {
           const ox = (Math.random() - 0.5) * 20;
@@ -196,8 +215,21 @@ class Unit extends Entity {
           GAME.units.push(u);
         }
       }
-      if (de.type === 'spell' && de.spell === 'rage') {
-          GAME.spellAreas.push(new SpellArea(this.x, this.y, radiusPx, 'rage', de.duration, this.team, de.amount));
+      
+      // 3. Trigger ANY Spell (Generic Handler)
+      if (de.type === 'spell' && de.spell) {
+          // Buat objek spell dummy untuk dikirim ke Game Engine
+          const spellObj = {
+              key: de.spell,
+              x: this.x,
+              y: this.y,
+              team: this.team,
+              radius: radiusPx,
+              // Kirim override stats (agar death effect bisa punya damage/durasi beda)
+              overrideDmg: de.amount, 
+              overrideDuration: de.duration
+          };
+          GAME.executeSpellEffect(spellObj);
       }
     }
   }
@@ -205,7 +237,7 @@ class Unit extends Entity {
   update(game) {
     if (this.deployTimer > 0) { this.deployTimer--; return; }
     
-    // MEGA KNIGHT JUMP
+    // --- SPECIAL MOVEMENT: JUMP (Mega Knight style) ---
     if (this.jumpStats && this.target && !this.dead && !this.stunned) {
         const dist = Utils.getDist(this, this.target);
         const minJump = this.jumpStats.minRange * CONFIG.gridSize;
@@ -228,7 +260,7 @@ class Unit extends Entity {
                 const distToLand = Math.hypot(this.jumpTargetX - this.x, this.jumpTargetY - this.y);
                 if (distToLand < 15) {
                     this.isJumping = false;
-                    const landRadius = 5 * CONFIG.gridSize; 
+                    const landRadius = 2.5 * CONFIG.gridSize; 
                     game.dealAreaDamage(this.x, this.y, landRadius, this.jumpStats.dmg, this.team, 'damage');
                     game.effects.push(new Effect(this.x, this.y, landRadius, "orange"));
                     this.attackTimer = 60; 
@@ -241,31 +273,37 @@ class Unit extends Entity {
     this.updateStatus();
     if (this.stunned > 0 || !this.hasWeapon) return;
 
-    // --- LOGIKA SLOW & RAGE ---
     let speedMult = 1.0;
     let attackSpeedMult = 1.0;
-
-    if (this.rageBoosted > 0) {
-        speedMult += this.rageAmount; 
-        attackSpeedMult += this.rageAmount; 
-    }
-    if (this.slowed > 0) {
-        speedMult -= this.slowAmount; 
-        attackSpeedMult -= this.slowAmount; 
-    }
-    
+    if (this.rageBoosted > 0) { speedMult += this.rageAmount; attackSpeedMult += this.rageAmount; }
+    if (this.slowed > 0) { speedMult -= this.slowAmount; attackSpeedMult -= this.slowAmount; }
     if (speedMult < 0.2) speedMult = 0.2;
     if (attackSpeedMult < 0.2) attackSpeedMult = 0.2;
+
+    if (this.tags.includes('charge')) {
+        // Hanya charge jika bergerak, tidak stun, tidak freeze, tidak knockback
+        if (this.isMoving && !this.stunned && !this.freezeActive) {
+            this.chargeTimer++;
+            if (this.chargeTimer > 90) { // 1.5 detik lari = Charge Aktif
+                this.isCharging = true;
+            }
+        } else {
+            // Reset jika berhenti atau terkena status effect
+            this.isCharging = false;
+            this.chargeTimer = 0;
+        }
+    }
+    // Jika charging, speed naik 2x (atau lebih)
+    if (this.isCharging) {
+        speedMult *= 2.0;
+    }
 
     let mult = speedMult * this.pushFactor; 
     this.speed = this.baseSpeed * mult;
 
     if (this.isSpawner) {
       this.spawnTimer++;
-      if (this.spawnTimer >= this.spawnInterval) {
-        this.spawnTimer = 0;
-        this.spawnMinions(game);
-      }
+      if (this.spawnTimer >= this.spawnInterval) { this.spawnTimer = 0; this.spawnMinions(game); }
     }
 
     this.updateTargeting(game);
@@ -277,14 +315,17 @@ class Unit extends Entity {
 
       if (dist <= reach) {
         this.isMoving = false;
-        
-        // Attack Timer dipengaruhi Slow/Rage
+
+        if (this.isCharging) {
+            this.attackTimer = 0; // Hapus delay attackSpeed/firstHitDelay
+        }
+
         if (this.attackTimer > 0) {
             this.attackTimer -= attackSpeedMult; 
             this.isAttacking = false;
         } else {
             this.isAttacking = true; 
-            this.doAttack(game, 1); // Pass 1 karena speed attack sudah dihandle timer
+            this.doAttack(game, 1); 
             this.attackTimer = this.hitSpeed; 
         }
       } else {
@@ -416,70 +457,89 @@ class Unit extends Entity {
 
   doAttack(game, attackMult = 1) {
     let finalDmg = this.dmg * attackMult;
+    let wasChargingAction = false; // Flag untuk menandai serangan ini adalah Charge
 
-    if (this.key === 'healer') {
-        this.heal(finalDmg * 0.5); 
-        const allies = [...game.units].filter(u => u.team === this.team && u !== this && !u.dead);
-        allies.forEach(u => {
-            if (Utils.getDist(this, u) < 5 * CONFIG.gridSize) {
-                u.heal(finalDmg * 0.5);
-                game.effects.push(new Effect(u.x, u.y, 20, "#00e676"));
-            }
-        });
+    // --- APPLY CHARGE DAMAGE ---
+    if (this.isCharging) {
+        const chargeDmg = CARDS[this.key]?.stats?.chargeDmg;
+        if (chargeDmg) finalDmg = chargeDmg;
+        
+        wasChargingAction = true; // Tandai bahwa ini serangan charge
+        
+        // Reset charge state
+        this.isCharging = false;
+        this.chargeTimer = 0;
+        
+        // Visual effect benturan
+        game.effects.push(new Effect(this.x, this.y, this.radius + 15, "#ffffff"));
+    }
+    // ---------------------------
+
+    // 1. HEALER Logic
+    if (this.tags.includes('healer')) {
+        if (this.kamikaze) {
+            game.effects.push(new Effect(this.x, this.y, this.splashRadius, "#00e676"));
+            const allies = [...game.units, ...game.buildings].filter(u => u.team === this.team && !u.dead);
+            allies.forEach(u => { if (Utils.getDist(this, u) <= this.splashRadius) u.heal(350); });
+            this.takeDamage(9999);
+            return;
+        } else {
+            this.heal(finalDmg * 0.5); 
+            const allies = [...game.units].filter(u => u.team === this.team && u !== this && !u.dead);
+            allies.forEach(u => { if (Utils.getDist(this, u) < 5 * CONFIG.gridSize) { u.heal(finalDmg * 0.5); game.effects.push(new Effect(u.x, u.y, 20, "#00e676")); } });
+        }
     }
 
-    if (this.key === 'healer_spirit') {
-        game.effects.push(new Effect(this.x, this.y, this.splashRadius, "#00e676"));
-        const allies = [...game.units, ...game.buildings].filter(u => u.team === this.team && !u.dead);
-        allies.forEach(u => {
-            if (Utils.getDist(this, u) <= this.splashRadius) u.heal(350);
-        });
-        this.takeDamage(9999);
-        return;
+    // 2. LIGHTNING / INSTANT STUN
+    if (this.tags.includes('stun-effect') && !this.projType && this.range > 0) {
+        let targets = [];
+        if (this.multiTarget && this.multiTarget > 1) {
+            const enemies = [...game.units, ...game.buildings, ...game.towers].filter(e => e.team !== this.team && !e.dead && !e.isHidden && Utils.getDist(this, e) <= this.range + e.radius + 10);
+            enemies.sort((a,b) => Utils.getDist(this, a) - Utils.getDist(this, b));
+            targets = enemies.slice(0, this.multiTarget);
+        } else if (this.target) {
+            targets = [this.target];
+        }
+
+        if (targets.length > 0) {
+            const stunDur = CARDS[this.key]?.stats?.stunDuration || 0.5;
+            targets.forEach(t => { 
+                t.takeDamage(finalDmg); 
+                t.applyStun(stunDur, "zap"); 
+                game.effects.push(new LightningEffect(this.x, this.y - 15, t.x, t.y)); 
+            });
+            return;
+        }
     }
 
-    if (this.multiTarget && this.multiTarget > 1) {
-        const enemies = [...game.units, ...game.buildings, ...game.towers].filter(e => e.team !== this.team && !e.dead && !e.isHidden && Utils.getDist(this, e) <= this.range + e.radius + 10);
-        enemies.sort((a,b) => Utils.getDist(this, a) - Utils.getDist(this, b));
-        const targets = enemies.slice(0, this.multiTarget);
-        targets.forEach(t => { t.takeDamage(finalDmg); t.applyStun(0.5, "zap"); game.effects.push(new LightningEffect(this.x, this.y - 15, t.x, t.y)); });
-        return;
-    }
-
-    // --- FIX KAMIKAZE (ICE SPIRIT MECHANISM) ---
+    // 3. KAMIKAZE
     if (this.kamikaze) {
       const canHitAir = this.tags.includes("air-target");
       const stats = CARDS[this.key]?.stats || {};
       const stunDur = stats.stunDuration || 0;
-      const isFreeze = this.key === 'ice_spirit'; // Detect Ice Spirit
+      const isFreeze = this.key === 'ice_spirit';
 
-      // Custom Loop untuk Area Damage agar bisa apply stun
       const targets = [...game.units, ...game.buildings, ...game.towers];
       for (let t of targets) {
           if (t.team !== this.team && !t.dead && !t.isHidden) {
               if (t.tags && t.tags.includes("air") && !canHitAir) continue;
-
               if (Utils.getDist(this, t) < this.splashRadius + t.radius) {
                   t.takeDamage(finalDmg);
-                  // Apply Freeze/Stun Effect
-                  if (stunDur > 0) {
-                      t.applyStun(stunDur, isFreeze ? "freeze" : "zap");
-                  }
+                  if (stunDur > 0) t.applyStun(stunDur, isFreeze ? "freeze" : "zap");
               }
           }
       }
-
-      // Visual Effect
+      
       let fxColor = "orange";
-      if (isFreeze) fxColor = "#00e5ff"; // Ice color
+      if (isFreeze) fxColor = "#00e5ff"; 
       else if (this.key === 'wall_breakers') fxColor = "#3e2723";
       
       game.effects.push(new Effect(this.x, this.y, this.splashRadius, fxColor));
-      
-      this.takeDamage(9999); // Die
+      this.takeDamage(9999);
       return;
     }
 
+    // 4. RAMP UP
     if (this.isRampUp) {
       this.rampStage += 0.5;
       if(this.rampStage > 40) this.rampStage = 40;
@@ -488,26 +548,40 @@ class Unit extends Entity {
       return;
     }
 
-    const stun = CARDS[this.key]?.stats?.stunDuration || 0;
-    const slow = CARDS[this.key]?.stats?.slowAmount || 0;
-    const slowDur = CARDS[this.key]?.stats?.slowDuration || 0;
+    // 5. STANDARD PROJECTILE & MELEE
+    if (this.projType || this.range > 0) {
+        // Projectile Attack
+        if (this.projType === "boomerang" || this.projType === "rolling" || this.range > 0) {
+            const hitAir = this.tags.includes("air-target"); 
+            const slowDur = CARDS[this.key]?.stats?.slowDuration || 0;
+            const slowAmt = CARDS[this.key]?.stats?.slowAmount || 0;
+            const hasSlow = this.tags.includes('slow-effect');
 
-    if (this.projType === "boomerang") {
-      this.hasWeapon = false; const hitAir = this.tags.includes("air-target"); const p = new Projectile(this.x, this.y, this.target, finalDmg, this.team, false, true, false, 0, 0, false, 0, 0, this.projType, this.projSpeed, this.maxRange, this); p.hitAir = hitAir; game.projectiles.push(p); return;
-    }
-    if (this.projType === "rolling") {
-        const hitAir = this.tags.includes("air-target"); const p = new Projectile(this.x, this.y, this.target, finalDmg, this.team, false, true, false, 0, 0, false, 0, 0, this.projType, this.projSpeed, this.maxRange, this); p.hitAir = hitAir; p.angle = this.angle; p.dx = Math.cos(p.angle); p.dy = Math.sin(p.angle); game.projectiles.push(p); return;
-    }
-    if (this.range > 0) {
-      const hitAir = this.tags.includes("air-target"); const p = new Projectile(this.x, this.y, this.target, finalDmg, this.team, false, this.isAreaDmg, false, this.splashRadius, 2, this.hasSlowEffect, slowDur, slow); p.hitAir = hitAir; game.projectiles.push(p);
-    } else {
-      if (this.isAreaDmg) {
+            const p = new Projectile(
+                this.x, this.y, this.target, finalDmg, this.team, 
+                false, this.isAreaDmg, false, this.splashRadius, 2, 
+                hasSlow, slowDur, slowAmt, 
+                this.projType || "normal", this.projSpeed, this.maxRange, this
+            );
+            
+            p.hitAir = hitAir;
+            if (this.projType === "rolling") { p.angle = this.angle; p.dx = Math.cos(p.angle); p.dy = Math.sin(p.angle); }
+            if (this.projType === "boomerang") { this.hasWeapon = false; }
+            
+            game.projectiles.push(p);
+        } 
+    } 
+    // MELEE AREA (Dark Prince Style)
+    else if (this.isAreaDmg) {
         const canHitAir = this.tags.includes("air-target"); 
         
+        // Simpan target mati atau tidak sebelum area damage
+        // (Agak tricky di area dmg, kita cek target utama saja)
+        const primaryTarget = this.target;
+
         game.dealAreaDamage(this.x, this.y, this.splashRadius, finalDmg, this.team, "damage", canHitAir);
         
-        // --- FIX MELEE SLOW (YETI) ---
-        if (this.hasSlowEffect) {
+        if (this.tags.includes('slow-effect')) {
              const slowD = CARDS[this.key]?.stats?.slowDuration || 1;
              const slowA = CARDS[this.key]?.stats?.slowAmount || 0.3;
              [...game.units, ...game.buildings, ...game.towers].forEach(t => {
@@ -519,11 +593,29 @@ class Unit extends Entity {
         }
 
         let fxColor = "orange";
-        if (this.hasSlowEffect) fxColor = "#29b6f6"; 
+        if (this.tags.includes('slow-effect')) fxColor = "#29b6f6"; 
         game.effects.push(new Effect(this.x, this.y, this.splashRadius, fxColor));
-      } else {
-        this.target.takeDamage(finalDmg);
-      }
+
+        // --- PAUSE IF CHARGE KILL (AREA) ---
+        if (wasChargingAction && primaryTarget && primaryTarget.dead) {
+            this.attackTimer = this.hitSpeed; // Delay attack
+            this.isMoving = false; // Stop moving
+        }
+    } 
+    // MELEE SINGLE (Prince Style)
+    else {
+        if (this.target) {
+            this.target.takeDamage(finalDmg);
+
+            // --- PAUSE IF CHARGE KILL (SINGLE) ---
+            // Jika ini serangan charge DAN target mati karenanya
+            if (wasChargingAction && this.target.dead) {
+                this.attackTimer = this.hitSpeed; // Paksa cooldown penuh (Jeda)
+                this.isMoving = false; // Berhenti visual
+                this.isCharging = false; // Pastikan charge mati
+                this.chargeTimer = 0; // Reset timer charge
+            }
+        }
     }
   }
 }

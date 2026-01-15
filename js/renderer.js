@@ -75,6 +75,18 @@ class Renderer {
         
         const drawY = entity.y + jumpOffset - (entity.isAir ? 15 : 0);
         ctx.translate(entity.x, drawY);
+
+        if (entity.isCharging) {
+            ctx.save();
+            ctx.rotate(entity.angle + Math.PI/2);
+            ctx.globalAlpha = 0.3;
+            ctx.fillStyle = "#fff";
+            // Gambar bayangan di belakang
+            ctx.beginPath(); ctx.arc(0, 15, r * 0.8, 0, Math.PI*2); ctx.fill();
+            ctx.beginPath(); ctx.arc(0, 30, r * 0.6, 0, Math.PI*2); ctx.fill();
+            ctx.restore();
+        }
+        
         ctx.rotate(entity.angle + Math.PI/2); 
 
         this.drawBody(ctx, v, r, teamColor);
@@ -112,36 +124,77 @@ class Renderer {
         const teamColor = t.team === 0 ? "#42a5f5" : "#ef5350";
         const darkerColor = t.team === 0 ? "#1565c0" : "#c62828";
 
-        // Range
-        ctx.save(); ctx.strokeStyle = "rgba(255, 255, 255, 0.3)"; ctx.lineWidth = 2; ctx.setLineDash([5, 5]); ctx.beginPath(); ctx.arc(t.x, t.y, t.range, 0, Math.PI * 2); ctx.stroke(); ctx.restore();
-
-        ctx.fillStyle = "rgba(0,0,0,0.3)"; ctx.beginPath(); ctx.ellipse(t.x, t.y+5, 30, 20, 0, 0, Math.PI*2); ctx.fill();
-
-        if(t.type==='king') {
-            const grad = ctx.createLinearGradient(t.x, t.y-25, t.x, t.y+25); grad.addColorStop(0, stoneColor); grad.addColorStop(1, '#333'); ctx.fillStyle = grad;
-            ctx.beginPath(); ctx.moveTo(t.x-25, t.y-20); ctx.lineTo(t.x+25, t.y-20); ctx.lineTo(t.x+25, t.y+25); ctx.lineTo(t.x-25, t.y+25); ctx.fill();
-            ctx.fillStyle = '#222'; ctx.fillRect(t.x-10, t.y+5, 20, 20);
-            if(!t.active) { ctx.strokeStyle='#555'; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(t.x, t.y+5); ctx.lineTo(t.x, t.y+25); ctx.stroke(); }
-        } else {
-            ctx.fillStyle = stoneColor; ctx.beginPath(); ctx.arc(t.x, t.y, 22, 0, Math.PI*2); ctx.fill();
-        }
-
-        ctx.save(); ctx.translate(t.x, t.y - (t.type==='king'?20:25)); ctx.rotate(t.angle);
-        if(t.type==='king' && t.active) { ctx.fillStyle = "#ffd54f"; ctx.fillRect(0, -14, 32, 28); ctx.fillStyle = darkerColor; ctx.beginPath(); ctx.arc(0,0, 18, 0, Math.PI*2); ctx.fill(); } 
-        else { ctx.fillStyle = darkerColor; ctx.fillRect(0, -8, 25, 16); ctx.fillStyle = teamColor; ctx.beginPath(); ctx.arc(0,0, 12, 0, Math.PI*2); ctx.fill(); }
+        // 1. Range Indicator
+        ctx.save(); 
+        ctx.strokeStyle = "rgba(255, 255, 255, 0.3)"; 
+        ctx.lineWidth = 2; ctx.setLineDash([5, 5]); 
+        ctx.beginPath(); ctx.arc(t.x, t.y, t.range, 0, Math.PI * 2); ctx.stroke(); 
         ctx.restore();
 
-        if(t.type==='king' && !t.active) { ctx.fillStyle = '#fff'; ctx.font = "bold 20px Arial"; ctx.textAlign="center"; ctx.fillText("Zzz", t.x, t.y-35); }
+        // 2. Base Shadow
+        ctx.fillStyle = "rgba(0,0,0,0.3)"; 
+        ctx.beginPath(); ctx.ellipse(t.x, t.y+5, 30, 20, 0, 0, Math.PI*2); ctx.fill();
+
+        // 3. Base Tower (Pondasi)
+        if(t.type === 'king') {
+            const size = 50; 
+            const half = size / 2;
+            ctx.fillStyle = stoneColor;
+            ctx.fillRect(t.x - half, t.y - half, size, size);
+            ctx.fillStyle = '#222'; 
+            ctx.fillRect(t.x - 10, t.y + 10, 20, 15); 
+        } else {
+            // Princess Base
+            ctx.fillStyle = stoneColor; 
+            ctx.beginPath(); ctx.arc(t.x, t.y, 22, 0, Math.PI*2); ctx.fill();
+        }
+
+        // 4. Turret / Kepala (Bagian yang Berputar)
+        ctx.save();
+        
+        // --- FIX POSISI: Offset dikurangi dari 25 ke 15 agar lebih ke tengah (Y) ---
+        const turretOffset = t.type === 'king' ? 5 : 5; 
+        
+        ctx.translate(t.x, t.y - turretOffset);
+        ctx.rotate(t.angle);
+
+        if(t.type === 'king') {
+            if (t.active) {
+                ctx.fillStyle = "#ffd54f"; 
+                ctx.fillRect(0, -14, 32, 28); 
+                ctx.fillStyle = darkerColor; 
+                ctx.beginPath(); ctx.arc(0, 0, 18, 0, Math.PI*2); ctx.fill();
+            } else {
+                ctx.fillStyle = darkerColor; 
+                ctx.beginPath(); ctx.arc(0, 0, 16, 0, Math.PI*2); ctx.fill();
+                ctx.fillStyle = teamColor; 
+                ctx.beginPath(); ctx.arc(0, 0, 10, 0, Math.PI*2); ctx.fill();
+            }
+        } else {
+            // PRINCESS TOWER
+            ctx.fillStyle = darkerColor; 
+            ctx.fillRect(0, -8, 25, 16); // Laras Meriam
+            
+            ctx.fillStyle = teamColor; 
+            ctx.beginPath(); ctx.arc(0, 0, 12, 0, Math.PI*2); ctx.fill(); // Kepala
+        }
+        ctx.restore();
+
+        // 5. Visual Tambahan (Zzz / Laser / HP)
+        if(t.type === 'king' && !t.active) {
+            ctx.fillStyle = '#fff'; 
+            ctx.font = "bold 20px Arial"; 
+            ctx.textAlign = "center"; 
+            ctx.fillText("Zzz", t.x, t.y - 35);
+        }
         
         this.drawStatusOutline(ctx, t, t.radius + 5);
 
-        // FIX VISUAL LASER INFERNO TOWER
         if (t.type === "inferno_tower" && t.active && t.target && !t.target.dead && t.stunned <= 0) {
             const dist = Utils.getDist(t, t.target);
             if (dist <= t.range + t.target.radius) {
                 ctx.save();
                 ctx.strokeStyle = "red"; 
-                // Gunakan 2 sebagai base width jika attackTimer logic tidak pas
                 ctx.lineWidth = Math.min(8, 2 + (120 - t.attackTimer) / 10); 
                 ctx.beginPath(); ctx.moveTo(t.x, t.y - 20); ctx.lineTo(t.target.x, t.target.y); ctx.stroke();
                 ctx.restore();

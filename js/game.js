@@ -277,10 +277,16 @@ class GameEngine {
     const y = spell.y;
     const team = spell.team;
     const cardData = CARDS[key];
-    const stats = cardData.stats;
-    const radius = spell.radius;
-    const dmg = stats.dmg || 0;
+    if (!cardData) return;
 
+    const stats = cardData.stats;
+    const radius = spell.radius; // from Spell Object
+    
+    // OVERRIDE CHECK (From Death Effect)
+    const dmg = spell.overrideDmg || stats.dmg || 0;
+    const duration = spell.overrideDuration || stats.duration || stats.rageDuration || stats.stunDuration || 0;
+
+    // Unit Spawners (Barrel / Miner)
     if (key === "goblin_barrel") {
       for (let i = 0; i < 3; i++) {
         const angle = ((Math.PI * 2) / 3) * i;
@@ -297,6 +303,7 @@ class GameEngine {
       return;
     }
 
+    // Projectile Spells
     if (key === "the_log") {
       const angle = team === 0 ? -Math.PI / 2 : Math.PI / 2;
       const p = new Projectile(
@@ -326,44 +333,37 @@ class GameEngine {
       return;
     }
 
+    // Persistent Area Spells
     if (key === "earthquake") {
-      this.spellAreas.push(
-        new SpellArea(x, y, radius, "earthquake", 3, team, dmg)
-      );
+      this.spellAreas.push(new SpellArea(x, y, radius, "earthquake", duration || 3, team, dmg));
       return;
     }
     if (key === "void") {
-      this.spellAreas.push(new SpellArea(x, y, radius, "void", 2, team, dmg));
+      this.spellAreas.push(new SpellArea(x, y, radius, "void", duration || 2, team, dmg));
       return;
     }
+    if (key === "rage") {
+        this.spellAreas.push(new SpellArea(x, y, radius, "rage", duration || 6, team, stats.rageBoost));
+        return;
+    }
+    if (key === "freeze") {
+        this.spellAreas.push(new SpellArea(x, y, radius, "freeze_visual", duration || 4, team));
+        this.dealAreaDamage(x, y, radius, 0, team, "freeze");
+        return;
+    }
+
+    // Instant Damage / Effect Spells
+    let effectColor = "orange";
+    if (key === "zap" || key === "lightning") effectColor = "#ffeb3b";
+    if (key === "meteor") effectColor = "#d84315";
+
     if (key === "meteor") {
-      this.effects.push(new Effect(x, y, radius + 20, "#d84315"));
+      this.effects.push(new Effect(x, y, radius + 20, effectColor));
       this.dealAreaDamage(x, y, radius, dmg, team, "damage");
       return;
     }
 
-    let effectColor = "orange";
-    if (key === "freeze") effectColor = "#00e5ff";
-    if (key === "rage") effectColor = "#ab47bc";
-    if (key === "zap" || key === "lightning") effectColor = "#ffeb3b";
-
-    if (key === "rage" || key === "freeze") {
-      this.spellAreas.push(
-        new SpellArea(
-          x,
-          y,
-          radius,
-          key === "rage" ? "rage" : "freeze_visual",
-          key === "rage" ? stats.rageDuration : stats.stunDuration,
-          team,
-          stats.rageBoost
-        )
-      );
-      if (key === "freeze")
-        this.dealAreaDamage(x, y, radius, 0, team, "freeze");
-      else if (key === "rage")
-        this.dealAreaDamage(x, y, radius, 0, team, "rage");
-    } else if (key === "lightning") {
+    if (key === "lightning") {
       let targets = [...this.units, ...this.buildings, ...this.towers].filter(
         (t) =>
           t.team !== team &&
@@ -382,6 +382,7 @@ class GameEngine {
         }, i * 200);
       });
     } else {
+      // Default (Fireball, Zap, Arrows)
       this.effects.push(new Effect(x, y, radius, effectColor));
       if (key === "zap") this.dealAreaDamage(x, y, radius, dmg, team, "stun");
       else this.dealAreaDamage(x, y, radius, dmg, team);

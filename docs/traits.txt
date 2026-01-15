@@ -1,0 +1,216 @@
+=== CLASH ROYALE CLONE - TRAITS & TAGS REFERENCE ===
+
+[ LOGIC TAGS ]
+Digunakan dalam array `tags: [...]` di data.js untuk menentukan perilaku unit.
+
+--- Tipe Unit ---
+ground          : Unit berjalan di darat.
+air             : Unit terbang (melewati sungai, hanya diserang air-target).
+single          : Serangan target tunggal.
+area            : Serangan area (Splash Damage).
+building-hunter : Hanya menyerang bangunan (Giant, Hog Rider).
+heavy           : Unit berat, tidak mudah didorong, prioritas push (PEKKA, Golem).
+fast            : Unit cepat, digunakan bot untuk bridge spam (Hog, Bandit).
+spawner         : Unit yang memunculkan unit lain (Witch).
+healer          : Unit yang menyembuhkan teman (Battle Healer).
+shielded        : Memiliki shield yang harus hancur sebelum HP utama berkurang.
+charge          : Melakukan charge damage ganda setelah berlari (Prince).
+kamikaze        : Mati saat menyerang (Spirits, Wall Breakers).
+siege           : Bangunan/Unit penyerang jarak jauh (X-Bow, Princess, Mortar).
+
+--- Target ---
+air-target      : Bisa menyerang unit udara.
+ground-only     : Hanya bisa menyerang darat (biasanya untuk bangunan/spell).
+
+--- Efek Serangan ---
+stun-effect     : Serangan memberikan efek Stun/Zap (E-Wiz).
+slow-effect     : Serangan memberikan efek Slow (Ice Wiz, Yeti).
+freeze          : Efek membekukan total (Ice Spirit).
+ramp-damage     : Damage meningkat seiring waktu (Inferno Tower/Dragon).
+log             : Efek knockback log (The Log).
+
+
+[ VISUAL TRAITS ]
+Digunakan dalam objek `visuals: { ... }` di data.js untuk merender tampilan.
+
+--- Head (Kepala) ---
+default         : Bulat standar
+skull           : Tengkorak putih
+skull_helm      : Tengkorak pakai helm emas
+skull_cap       : Tengkorak pakai topi penerbang
+skull_giant     : Tengkorak raksasa
+hood            : Tudung (Archer)
+hood_ice        : Tudung es (Ice Wiz)
+hood_ninja      : Tudung ninja hitam
+hood_dark       : Tudung gelap (Night Witch)
+helmet          : Helm besi standar
+helmet_samurai  : Helm samurai merah
+helmet_viking   : Helm viking (Elite Barb)
+helmet_open     : Helm terbuka (Royal Giant)
+helmet_miner    : Helm tambang dengan lilin
+helmet_bucket   : Helm ember (Dark Prince)
+helmet_full     : Helm full face (Mega Knight)
+helmet_tech     : Helm teknologi (Inferno Dragon)
+mohawk          : Rambut mohawk (Hog, Goblin)
+robot_horn      : Kepala robot bertanduk (PEKKA)
+coil            : Kumparan listrik (Sparky)
+horse_wood      : Kepala kuda kayu
+demon           : Kepala minion
+bat             : Kepala kelelawar
+bald            : Botak (Giant)
+hair_orange     : Rambut oranye (Valkyrie)
+hair_spiky      : Rambut tajam (E-Wiz)
+hair_long       : Rambut panjang (Healer)
+tiara           : Mahkota kecil (Princess)
+mask            : Topeng kayu (Dart Goblin)
+mask_hood       : Topeng eksekutor
+goblin_blue     : Goblin biru (Bowler)
+antlers         : Tanduk rusa (Druid)
+ghillie         : Semak-semak (Sniper)
+rock            : Kepala batu (Golem)
+rock_head       : Kepala lava
+ancient_helm    : Helm kuno (Titan)
+lizard          : Kepala kadal (Basilisk)
+fur_white       : Bulu putih (Yeti)
+spirit          : Kepala roh (Spirits)
+machine         : Mesin terbang
+balloon         : Balon udara
+hat_winter      : Topi dingin (Lumberjack)
+
+--- Body (Badan) ---
+default         : Kotak/Bulat standar
+armor_heavy     : Armor tebal (PEKKA, MK)
+armor_plate     : Plat besi (Mini PEKKA)
+armor_samurai   : Armor merah samurai
+armor_light     : Armor ringan (Healer)
+ancient_armor   : Armor kuno (Titan)
+robe            : Jubah penyihir
+robe_green      : Jubah hijau (Druid)
+robe_dark       : Jubah gelap (Witch)
+spirit          : Badan roh bulat
+rock            : Badan batu (Golem)
+rock_body       : Badan lava
+dragon          : Badan naga
+wood_box        : Kotak kayu
+wood_mech       : Mekanik kayu
+ribs            : Tulang rusuk (Skeleton)
+ribs_armor      : Tulang berarmor (Guards)
+demon           : Badan minion
+cloth           : Baju kain biasa
+cloth_tight     : Baju ketat (Ninja)
+cloth_dirty     : Baju kotor (Miner)
+cloth_heavy     : Baju tebal (Executioner)
+snake           : Badan ular
+pig             : Badan babi
+basket          : Keranjang (Balloon)
+fur_white       : Bulu tebal (Yeti)
+shirt_plaid     : Kemeja kotak-kotak (Lumberjack)
+dress           : Gaun (Princess)
+ghillie         : Baju kamuflase
+
+--- Weapon (Senjata) ---
+sword           : Pedang standar
+sword_giant     : Pedang besar
+sword_light     : Pedang cahaya
+dual_swords     : Dua pedang (PEKKA)
+katana          : Katana (Samurai)
+bow             : Busur
+bow_fire        : Busur api
+spear           : Tombak
+lance           : Tombak berkuda (Prince)
+staff           : Tongkat sihir
+staff_axe       : Tongkat kapak (Night Witch)
+staff_wood      : Tongkat kayu
+fist            : Tangan kosong
+fist_rock       : Tangan batu
+fist_giant      : Tangan raksasa
+fist_ice        : Tangan es
+hammer          : Palu (Hog)
+mace            : Gada (Dark Prince)
+mace_hands      : Tangan gada (Mega Knight)
+axe             : Kapak
+axe_double      : Kapak ganda (Valkyrie)
+axe_bottle      : Botol Rage (Lumberjack)
+axe_throw       : Kapak lempar (Executioner)
+cannon_hand     : Meriam tangan (RG)
+rifle_long      : Senapan panjang (Sniper)
+dagger          : Pisau kecil
+dual_dagger     : Dua pisau
+spit            : Ludah (Minion)
+spit_fire       : Semburan api (Baby Dragon)
+bite            : Gigitan (Bat)
+bite_venom      : Gigitan racun
+musket          : Senapan (Musketeer)
+magic_fire      : Sihir api
+magic_ice       : Sihir es
+magic_zap       : Sihir listrik
+blowdart        : Sumpit racun
+cannon          : Meriam (Flying Machine)
+bomb_drop       : Bom jatuh (Balloon)
+bomb_carry      : Bom bawa (Giant Skeleton)
+bomb_hug        : Bom peluk (Wall Breakers)
+rock_hold       : Batu gelinding (Bowler)
+coil_gun        : Tembakan listrik (Sparky)
+beam_emitter    : Laser (Inferno)
+shovel          : Sekop (Miner)
+none            : Tidak ada senjata visual
+
+--- Visual Props (Boolean) ---
+hasWings        : true (Punya sayap)
+hasPropeller    : true (Punya baling-baling)
+isMounted       : true (Sedang menunggangi sesuatu)
+
+--- Color & Scale ---
+color           : Hex code (Contoh: '#ff0000') untuk outline/efek
+skin            : Hex code untuk warna kulit/dasar
+scale           : Float (Contoh: 1.5) untuk ukuran unit
+
+
+[ STATS PROPERTIES ]
+Digunakan dalam objek `stats: { ... }`
+
+hp              : Hitpoints (Nyawa)
+dmg             : Damage per hit
+hitSpeed        : Kecepatan serangan (detik, makin kecil makin cepat)
+speed           : Kecepatan gerak (0.5 lambat - 2.0 cepat)
+range           : Jarak serangan (grid). 0 = Melee.
+sightRange      : Jarak pandang untuk mengejar musuh.
+count           : Jumlah unit yang muncul saat spawn.
+deployTime      : Waktu tunggu sebelum unit bisa bergerak/serang.
+loadTime        : Waktu reload khusus (Sparky/Sniper).
+splashRadius    : Radius area damage.
+stunDuration    : Durasi efek stun (detik).
+slowDuration    : Durasi efek slow (detik).
+slowAmount      : Persentase slow (0.3 = 30%).
+chargeDmg       : Damage saat charge (Prince).
+projectile      : Tipe peluru ('rolling', 'rolling_log', 'boomerang', 'normal').
+projSpeed       : Kecepatan peluru.
+maxRange        : Jarak maksimal peluru (khusus boomerang/rolling).
+multiTarget     : Jumlah target sekaligus (E-Wiz = 2).
+
+--- Special Effects Objects ---
+deathEffect: { 
+    type: 'explode' | 'split' | 'spell', 
+    dmg: 100, 
+    radius: 3, 
+    unit: 'key_unit', 
+    count: 2, 
+    spell: 'key_spell',
+    duration: 5,
+    amount: 500
+}
+
+spawnEffect: { 
+    type: 'damage' | 'zap' | 'slow', 
+    dmg: 100, 
+    radius: 3,
+    duration: 2,
+    amount: 0.3
+}
+
+jumpAttack: {  (Khusus Mega Knight)
+    minRange: 3, 
+    maxRange: 5, 
+    dmg: 400, 
+    speed: 2 
+}
