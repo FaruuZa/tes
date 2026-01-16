@@ -21,5 +21,13 @@ const Utils = {
             // Kita pakai Math.min agar game selalu FIT di layar (tidak terpotong)
             game.scale = Math.min(CANVAS.width / CONFIG.logicWidth, CANVAS.height / CONFIG.logicHeight);
         }
-    }
+    },
+
+    lerpAngle: (a, b, t) => {
+        let diff = b - a;
+        while (diff > Math.PI) diff -= Math.PI * 2;
+        while (diff < -Math.PI) diff += Math.PI * 2;
+        return a + diff * t;
+    },
+
 };

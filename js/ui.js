@@ -1,20 +1,22 @@
 /**
- * UI.JS - Updated (Sorting by Type logic included)
+ * UI.JS - Updated for "Juicy" 3D Style
+ * Menyesuaikan struktur HTML dengan CSS baru (Droplet Elixir, Rotasi Span, dll)
  */
 const UI = {
   myDeck: [],
   currentFilter: "all",
   sortAsc: true,
   searchQuery: "",
+  selectedDifficulty: "normal",
 
   init: () => {
     UI.renderDeckBuilder();
     UI.renderDeckSlots(); 
     UI.setupEventListeners();
-    UI.selectedDifficulty = "normal";
   },
 
   setupEventListeners: () => {
+    // Difficulty Buttons
     document.querySelectorAll(".diff-btn").forEach((btn) => {
       btn.onclick = () => {
         document.querySelectorAll(".diff-btn").forEach((b) => b.classList.remove("active"));
@@ -23,6 +25,7 @@ const UI = {
       };
     });
 
+    // Filter Buttons
     document.querySelectorAll(".filter-btn").forEach((btn) => {
       btn.onclick = () => {
         document.querySelectorAll(".filter-btn").forEach((b) => b.classList.remove("active"));
@@ -30,16 +33,20 @@ const UI = {
         UI.setFilter(btn.getAttribute("data-filter") || "all");
       };
     });
+
     const sortBtn = document.getElementById("sort-btn");
     if (sortBtn) sortBtn.onclick = UI.toggleSort;
+
     const searchInput = document.getElementById("db-search");
     if (searchInput)
       searchInput.onkeyup = (e) => {
         UI.searchQuery = e.target.value.toLowerCase();
         UI.renderDeckBuilder();
       };
+
     const startBtn = document.getElementById("start-btn");
     if (startBtn) startBtn.onclick = UI.startGame;
+
     const closeInfoBtn = document.getElementById("close-info");
     if (closeInfoBtn) closeInfoBtn.onclick = UI.closeInfo;
   },
@@ -48,6 +55,7 @@ const UI = {
     const container = document.getElementById("db-cards");
     if (!container) return;
     container.innerHTML = "";
+    
     let keys = Object.keys(CARDS).filter((k) => !CARDS[k].hiddenInDeck);
 
     // 1. Filter Logic
@@ -56,23 +64,17 @@ const UI = {
     if (UI.searchQuery)
       keys = keys.filter((k) => CARDS[k].name.toLowerCase().includes(UI.searchQuery));
 
-    // 2. Sort Logic (Updated)
+    // 2. Sort Logic
     keys.sort((a, b) => {
         const cA = CARDS[a];
         const cB = CARDS[b];
 
-        // Jika filter "ALL", urutkan berdasarkan Tipe dulu (Unit -> Building -> Spell)
         if (UI.currentFilter === "all") {
             const typePriority = { 'unit': 1, 'building': 2, 'spell': 3 };
             const typeA = typePriority[cA.type] || 99;
             const typeB = typePriority[cB.type] || 99;
-            
-            if (typeA !== typeB) {
-                return typeA - typeB; // Selalu Unit paling atas
-            }
+            if (typeA !== typeB) return typeA - typeB;
         }
-
-        // Kemudian Sort by Cost
         return UI.sortAsc ? cA.cost - cB.cost : cB.cost - cA.cost;
     });
 
@@ -82,9 +84,16 @@ const UI = {
       const el = document.createElement("div");
 
       el.className = "db-card" + (isSelected ? " selected" : "");
-      if (isSelected) el.style.opacity = "0.5";
+      if (isSelected) el.style.opacity = "0.6";
 
-      el.innerHTML = `<div class="db-card-cost">${data.cost}</div><div class="db-card-icon">${data.icon}</div><div class="db-card-name">${data.name}</div>`;
+      // UPDATE: Menggunakan struktur .card-cost > span agar konsisten dengan CSS baru
+      el.innerHTML = `
+        <div class="card-cost" style="width:20px; height:20px; font-size:10px; top:-4px; left:-4px;">
+            <span>${data.cost}</span>
+        </div>
+        <div class="db-card-icon">${data.icon}</div>
+        <div class="db-card-name">${data.name}</div>
+      `;
 
       el.onclick = () => UI.toggleCard(key);
       el.oncontextmenu = (e) => { e.preventDefault(); UI.showInfo(key); };
@@ -105,10 +114,16 @@ const UI = {
 
       if (key) {
         const d = CARDS[key];
-        slot.innerHTML = `<div>${d.icon}</div><div class="slot-cost">${d.cost}</div>`;
+        // UPDATE: Menggunakan struktur droplet card-cost juga disini
+        slot.innerHTML = `
+            <div class="card-cost" style="width:18px; height:18px; font-size:9px; top:-5px; left:-5px;">
+                <span>${d.cost}</span>
+            </div>
+            <div>${d.icon}</div>
+        `;
         slot.onclick = () => UI.toggleCard(key);
       } else {
-        slot.innerHTML = `<div style="opacity:0.2; font-size:12px;">+</div>`;
+        slot.innerHTML = `<div style="opacity:0.2; font-size:18px; font-weight:bold;">+</div>`;
       }
       slotContainer.appendChild(slot);
     }
@@ -129,6 +144,7 @@ const UI = {
     UI.currentFilter = t;
     UI.renderDeckBuilder();
   },
+
   toggleSort: () => {
     UI.sortAsc = !UI.sortAsc;
     const btn = document.getElementById("sort-btn");
@@ -146,7 +162,12 @@ const UI = {
       avgElixir = (total / UI.myDeck.length).toFixed(1);
     }
 
-    countDiv.innerHTML = `<span style="color:${UI.myDeck.length === 8 ? "#00e5ff" : "#aaa"}">${UI.myDeck.length}/8</span> <span style="font-size:10px; color:#d000ff;">(Avg: ${avgElixir})</span>`;
+    // Update warna teks agar kontras dengan background gelap
+    const countColor = UI.myDeck.length === 8 ? "#ffce00" : "#aaa"; // Gold jika penuh
+    countDiv.innerHTML = `
+        <span style="color:${countColor}; font-weight:bold;">${UI.myDeck.length}/8</span> 
+        <span style="font-size:11px; color:#d000ff; margin-left:5px; font-weight:bold;">(Avg: ${avgElixir})</span>
+    `;
 
     if (UI.myDeck.length === 8) {
       btn.classList.add("ready");
@@ -155,7 +176,7 @@ const UI = {
     } else {
       btn.classList.remove("ready");
       btn.disabled = true;
-      btn.innerText = "LENGKAPI";
+      btn.innerText = "LENGKAPI DECK";
     }
   },
 
@@ -189,15 +210,10 @@ const UI = {
     }
 
     if (s.range !== undefined) html += row("Range", s.range > 0 ? (s.range / CONFIG.gridSize).toFixed(1) : "Melee", "🎯");
-    
     if (s.count > 1) html += row("Count", "x" + s.count, "👥");
     if (s.speed) html += row("Speed", s.speed, "👟");
     if (s.deployTime) html += row("Deploy", s.deployTime + "s", "⏳");
     
-    if (s.stunDuration) html += row("Stun", s.stunDuration + "s", "😵");
-    if (s.slowDuration) html += row("Slow", s.slowDuration + "s", "❄️");
-    if (d.deathEffect) html += row("Death", d.deathEffect.type.toUpperCase(), "💀");
-
     document.getElementById("ci-stats").innerHTML = html;
     document.getElementById("card-info-modal").style.display = "block";
   },
@@ -211,7 +227,6 @@ const UI = {
     document.getElementById("deck-builder").style.display = "none";
     document.getElementById("game-viewport").style.display = "flex";
 
-    // Reset Canvas Size
     const cvs = document.getElementById("gameCanvas");
     if (cvs) {
       setTimeout(() => { Utils.resize(GAME); }, 100);
@@ -223,12 +238,12 @@ const UI = {
     }
   },
 
+  // --- BAGIAN PENTING: Render Hand dengan Struktur Baru ---
   renderHand: () => {
     if (typeof GAME === "undefined") return;
     const con = document.getElementById("hand-cards");
     if (!con) return;
     
-    // --- UPDATE NEXT ICON HERE ---
     const nextIcon = document.getElementById("next-card-icon");
     if (nextIcon && GAME.nextCard && CARDS[GAME.nextCard]) {
       nextIcon.innerText = CARDS[GAME.nextCard].icon;
@@ -247,18 +262,25 @@ const UI = {
         };
         con.appendChild(div);
       }
+      
       if (!k || !CARDS[k]) {
         div.style.visibility = "hidden";
+        // Reset atribut agar tidak ada data sisa
+        div.removeAttribute("data-card");
         return;
       }
+      
       div.style.visibility = "visible";
       const d = CARDS[k];
+      
+      // Handle Selection State
       if (idx === GAME.selectedCardIdx) {
         if (!div.classList.contains("active")) div.classList.add("active");
       } else {
         if (div.classList.contains("active")) div.classList.remove("active");
       }
       
+      // Handle Cost/Disabled State
       const isAffordable = GAME.elixir >= d.cost;
       if (!isAffordable) {
           if (!div.classList.contains("disabled")) div.classList.add("disabled");
@@ -266,9 +288,16 @@ const UI = {
           if (div.classList.contains("disabled")) div.classList.remove("disabled");
       }
 
+      // Render Content (Hanya jika kartu berubah)
       if (div.getAttribute("data-card") !== k) {
         div.setAttribute("data-card", k);
-        div.innerHTML = `<div class="card-cost">${d.cost}</div><div class="card-icon">${d.icon}</div><div class="card-name">${d.name}</div>`;
+        // INI BAGIAN UTAMA YANG DIUBAH:
+        // Menambahkan <span> di dalam .card-cost
+        div.innerHTML = `
+            <div class="card-cost"><span>${d.cost}</span></div>
+            <div class="card-icon">${d.icon}</div>
+            <div class="card-name">${d.name}</div>
+        `;
       }
     });
   },
@@ -277,8 +306,10 @@ const UI = {
     if (typeof GAME === "undefined") return;
     const txt = document.getElementById("elixir-text");
     const fill = document.getElementById("elixir-fill");
+    
     if (txt) txt.innerText = Math.floor(GAME.elixir);
     if (fill) fill.style.width = (GAME.elixir / CONFIG.maxElixir) * 100 + "%";
+    
     UI.renderHand();
   },
 };
