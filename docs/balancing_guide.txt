@@ -1,0 +1,133 @@
+BALANCING GUIDE – EXTREME META VERSION
+=================================
+
+Dokumen ini adalah panduan resmi untuk melakukan balancing unit.
+Gunakan ini sebagai REFERENSI UTAMA saat menambah atau mengubah unit.
+
+
+1. FILOSOFI DASAR
+----------------
+• Setiap unit HARUS punya satu peran utama.
+• Tidak boleh ada unit serba bisa.
+• Counter harus jelas dan keras.
+• Jika unit kuat di satu aspek, ia WAJIB lemah di aspek lain.
+
+
+2. KATEGORI UNIT & RASIO STAT
+----------------------------
+
+A. TANK
+Tag: tank, heavy
+HP      : 3000 – 4500
+DMG     : rendah – sedang
+Speed   : lambat (0.5 – 0.8)
+AoE     : TIDAK BOLEH
+Counter : swarm, control
+
+B. MINI TANK
+Tag: mini_tank
+HP      : 1400 – 2200
+DMG     : sedang
+Speed   : normal
+AoE     : opsional (damage -25%)
+Counter : DPS tinggi
+
+C. DPS / GLASS CANNON
+Tag: glass_cannon, dps
+HP      : 300 – 600
+DMG     : sangat tinggi
+Speed   : normal – cepat
+AoE     : sangat dibatasi
+Counter : assassin, spell, dive
+
+D. SWARM
+Tag: swarm
+HP      : 50 – 120
+Count   : 4 – 8
+DMG     : kecil per unit
+AoE     : TIDAK BOLEH
+Counter : AoE, splash
+
+E. SUPPORT / CONTROL
+Tag: support, control
+HP      : sedang
+DMG     : rendah
+Power   : effect (slow, heal, stun)
+Solo    : TIDAK BOLEH kuat
+
+
+3. ATURAN MELEE
+---------------
+• single      : damage penuh
+• cleave      : -15% damage
+• circular    : -25% damage
+
+Larangan keras:
+• circular + DPS tinggi
+• circular + speed cepat
+• cleave + fast + tanky
+
+
+4. ATURAN RANGE & SIGHT
+----------------------
+• Range panjang ≠ sight panjang
+• Unit sniper harus butuh vision
+• sightRange normal: 4.5 – 6
+• range ekstrem (>8) → HP harus rendah
+
+
+5. ATURAN AoE
+-------------
+• AoE melee hanya untuk anti swarm
+• AoE ranged = damage turun
+• splashRadius besar → hitSpeed lambat
+
+
+6. TAG WAJIB DIGUNAKAN
+---------------------
+• tank
+• mini_tank
+• glass_cannon
+• swarm
+• support
+• control
+• aoe
+• win_condition
+
+Tag menentukan balancing, bukan sekadar label.
+
+
+7. DESAIN UNIT BARU (CHECKLIST)
+-------------------------------
+Sebelum menambah unit, jawab:
+1. Dia counter siapa?
+2. Dia dikalahkan siapa?
+3. Apa satu hal yang dia kuasai?
+4. Apa satu kelemahan fatalnya?
+
+Jika tidak bisa dijawab → unit BELUM LAYAK.
+
+
+8. RULE OF EXTREMES
+------------------
+• Lebih baik unit terlalu kuat tapi jelas
+  daripada seimbang tapi membosankan.
+• Nerf/buff boleh ekstrim, asal identitas jelas.
+
+
+9. CONTOH KESALAHAN UMUM
+-----------------------
+✗ DPS + Tank + AoE
+✗ Swarm tapi HP tebal
+✗ Support bisa solo tower
+✗ Semua unit punya slow/stun
+
+
+10. TARGET META
+---------------
+• Rock–Paper–Scissors
+• Tidak ada best unit
+• Skill & komposisi > angka mentah
+
+=================================
+END OF BALANCING GUIDE

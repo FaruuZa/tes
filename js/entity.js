@@ -1130,30 +1130,35 @@ class Unit extends Entity {
     // dan BUKAN unit pelompat sungai/udara
     const isAvoidanceActive = (Math.abs(pushX) > 0.1 || Math.abs(pushY) > 0.1);
     
-    if (!this.isAir && !isAvoidanceActive) {
+    if (!this.isAir) {
       const riverY = 350;
-      // Jika Hog Rider (river-jumper), dia bebas, tidak perlu dipaksa lewat jembatan
+      
+      // Cek apakah unit tipe pejalan kaki biasa (bukan jumper/flyer)
       if (!this.tags.includes("river-jumper")) {
           const isCrossing = (this.y < riverY && ty > riverY) || (this.y > riverY && ty < riverY);
           
           if (isCrossing && !this.canJumpRiver) {
-            const bX = Math.abs(this.x - 100) < Math.abs(this.x - 340) ? 100 : 340; // Jembatan terdekat
+            const bX = Math.abs(this.x - 100) < Math.abs(this.x - 340) ? 100 : 340; // Pilih jembatan terdekat
             const distToBridgeX = Math.abs(this.x - bX);
             
-            if (distToBridgeX > 15) {
-              // Arahkan vektor ke mulut jembatan
-              const bridgeEntryY = riverY + (this.y < riverY ? -40 : 40);
+            if (distToBridgeX > 10) { // Toleransi diperkecil biar lebih akurat
+              // OVERWRITE vektor gerak sepenuhnya ke mulut jembatan
+              // Jangan pedulikan avoidance gedung lain jika mau nyebrang
+              const bridgeEntryY = riverY + (this.y < riverY ? -20 : 20); // Titik masuk
+              
               let bridgeDirX = bX - this.x;
               let bridgeDirY = bridgeEntryY - this.y;
               const bDist = Math.hypot(bridgeDirX, bridgeDirY);
               
-              // Ganti vektor final sepenuhnya ke arah jembatan
-              finalDirX = bridgeDirX / bDist;
-              finalDirY = bridgeDirY / bDist;
+              if (bDist > 0) {
+                  finalDirX = bridgeDirX / bDist;
+                  finalDirY = bridgeDirY / bDist;
+              }
             } else {
-              // Sudah di jembatan: Luruskan Y, koreksi X pelan-pelan
-              finalDirX = (bX - this.x) * 0.2; // Koreksi X soft
-              finalDirY = (ty - this.y) > 0 ? 1 : -1; // Y lurus
+              // Sudah di area X jembatan: Luruskan Y
+              // Bias kecil ke tengah jembatan (bX) agar tidak jatuh
+              finalDirX = (bX - this.x) * 0.5; 
+              finalDirY = (ty - this.y) > 0 ? 1 : -1; 
             }
           }
       }
@@ -1226,6 +1231,31 @@ class Unit extends Entity {
           this.y += Math.sin(angle) * overlap;
         }
       }
+    }
+
+    if (!this.isAir && !this.tags.includes("river-jumper") && !this.canJumpRiver) {
+        const riverTop = 335;
+        const riverBottom = 365;
+        
+        // Cek apakah unit ada di dalam zona Y sungai
+        if (this.y > riverTop && this.y < riverBottom) {
+            // Cek apakah unit ada di X Jembatan (Kiri: 70-130, Kanan: 310-370)
+            const onLeftBridge = this.x > 70 && this.x < 130;
+            const onRightBridge = this.x > 310 && this.x < 370;
+
+            if (!onLeftBridge && !onRightBridge) {
+                // UNIT TENGGELAM! DORONG KELUAR!
+                // Dorong ke sisi sungai terdekat
+                const distToTop = Math.abs(this.y - riverTop);
+                const distToBottom = Math.abs(this.y - riverBottom);
+
+                if (distToTop < distToBottom) {
+                    this.y = riverTop - 1; // Dorong ke atas
+                } else {
+                    this.y = riverBottom + 1; // Dorong ke bawah
+                }
+            }
+        }
     }
   }
 }

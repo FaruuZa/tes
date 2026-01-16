@@ -32,8 +32,9 @@ const CARDS = {
   // =================================================================
   giant: {
     name: "Giant", cost: 5, icon: "🗿", type: "unit",
-    stats: { hp: 3275, dmg: 211, hitSpeed: 1.5, speed: 0.7, range: 0, targetType: 'ground-only' },
-    tags: ["ground", "win_condition", "tank", "building-hunter", "heavy"],
+    // HP Tank range 3000-4500 [cite: 5]
+    stats: { hp: 3500, dmg: 211, hitSpeed: 1.5, speed: 0.7, range: 0, targetType: 'ground-only' },
+    tags: ["ground", "win_condition", "tank", "building-hunter", "heavy", "melee", "single"],
     visuals: { scale: 1.5, skin: "#f0ceab", head: "bald", body: "cloth", weapon: "fist_giant", color: "#8d6e63" },
     desc: "Tanker lambat yang hanya mengincar bangunan.",
   },
@@ -47,7 +48,7 @@ const CARDS = {
   golem: {
     name: "Golem", cost: 8, icon: "🪨", type: "unit",
     stats: { hp: 4256, dmg: 259, hitSpeed: 2.5, speed: 0.4, range: 0, targetType: 'ground-only', deployTime: 3 },
-    tags: ["ground", "win_condition", "tank", "building-hunter", "heavy"],
+    tags: ["ground", "win_condition", "tank", "building-hunter", "heavy", "melee", "single"],
     effects: { onDeath: [{ type: 'damage', amount: 259, radius: 2.5 }, { type: 'spawn', unit: 'golemite', count: 2 }] },
     visuals: { scale: 1.6, skin: "#8d6e63", head: "rock", body: "rock", weapon: "fist_rock", color: "#5d4037" },
     desc: "Sangat tebal. Meledak menjadi Golemites saat mati.",
@@ -55,14 +56,14 @@ const CARDS = {
   hog_rider: {
     name: "Hog Rider", cost: 4, icon: "🐗", type: "unit",
     stats: { hp: 1408, dmg: 264, hitSpeed: 1.6, speed: 1.8, range: 0, targetType: 'ground-only' },
-    tags: ["ground", "win_condition", "building-hunter", "fast", "river-jumper"],
-    visuals: { scale: 1.1, skin: "#8d6e63", head: "mohawk", body: "pig", weapon: "hammer", color: "#795548" }, // Body pig agar terlihat naik babi
+    tags: ["ground", "win_condition", "building-hunter", "fast", "river-jumper", "melee", "single"],
+    visuals: { scale: 1.1, skin: "#8d6e63", head: "mohawk", body: "pig", weapon: "hammer", color: "#795548" },
     desc: "Melompati sungai untuk menghancurkan tower.",
   },
   balloon: {
     name: "Balloon", cost: 5, icon: "🎈", type: "unit",
     stats: { hp: 1396, dmg: 800, hitSpeed: 3.0, speed: 0.9, range: 0, targetType: 'ground-only', firstHitDelay: 0.5 },
-    tags: ["air", "win_condition", "building-hunter", "heavy"],
+    tags: ["air", "win_condition", "building-hunter", "heavy", "melee", "single"],
     effects: { onDeath: [{ type: 'damage', amount: 272, radius: 3 }] },
     visuals: { scale: 1.3, skin: "#8d6e63", head: "balloon", body: "basket", weapon: "bomb_drop", color: "#d32f2f" },
     desc: "Pengebom udara yang mematikan.",
@@ -70,7 +71,7 @@ const CARDS = {
   wall_breakers: {
     name: "Wall Breakers", cost: 2, icon: "🧨", type: "unit",
     stats: { hp: 275, dmg: 325, hitSpeed: 0.1, speed: 1.7, range: 0, count: 2, targetType: 'ground-only' },
-    tags: ["ground", "win_condition", "building-hunter", "kamikaze", "fast", "area"],
+    tags: ["ground", "win_condition", "building-hunter", "kamikaze", "fast", "area", "melee", "single"],
     visuals: { scale: 0.8, skin: "#ffffff", head: "bandana", body: "ribs", weapon: "bomb_hug", accessory: "backpack_survival", color: "#616161" },
     desc: "Pelari bunuh diri yang mengincar bangunan.",
   },
@@ -80,14 +81,17 @@ const CARDS = {
   // =================================================================
   knight: {
     name: "Knight", cost: 3, icon: "⚔️", type: "unit",
-    stats: { hp: 1400, dmg: 165, hitSpeed: 1.2, speed: 1.0, range: 0, targetType: 'ground-only', sightRange: 5.5 },
+    // Mini Tank HP: 1400-2200 [cite: 5]
+    stats: { hp: 1450, dmg: 165, hitSpeed: 1.2, speed: 1.0, range: 0, targetType: 'ground-only', sightRange: 5.5 },
     tags: ["ground", "mini_tank", "melee", "single"],
     visuals: { scale: 1.0, skin: "#f0ceab", head: "helmet", body: "armor_plate", weapon: "sword", accessory: "cape_royal", color: "#1976d2" },
     desc: "Prajurit tangguh dan murah.",
   },
   valkyrie: {
     name: "Valkyrie", cost: 4, icon: "🪓", type: "unit",
-    stats: { hp: 1650, dmg: 220, hitSpeed: 1.5, speed: 1.0, range: 0, targetType: 'ground-only', splashRadius: 2.5 },
+    // UPDATE: meleeType 'circular' applied because of 360 splash [cite: 53]
+    // Balancing: AoE melee damage slightly penalized (-25%) compared to Knight 
+    stats: { hp: 1650, dmg: 220, hitSpeed: 1.5, speed: 1.0, range: 0, targetType: 'ground-only', splashRadius: 2.5, meleeType: 'circular' },
     tags: ["ground", "mini_tank", "melee", "aoe"],
     visuals: { scale: 1.0, skin: "#f0ceab", head: "hair_orange", body: "cloth", weapon: "axe_double", accessory: "cape_tattered", color: "#ff7043" },
     desc: "Berputar membasmi pasukan darat.",
@@ -95,30 +99,34 @@ const CARDS = {
   mini_pekka: {
     name: "Mini P.E.K.K.A", cost: 4, icon: "🥞", type: "unit",
     stats: { hp: 1129, dmg: 598, hitSpeed: 1.8, speed: 1.6, range: 0, targetType: 'ground-only' },
-    tags: ["ground", "dps", "tank_killer", "fast"],
+    tags: ["ground", "dps", "tank_killer", "fast", "melee", "single"],
     visuals: { scale: 1.0, skin: "#607d8b", head: "robot_horn", body: "armor_plate", weapon: "sword", color: "#90caf9" },
     desc: "Kecil tapi damage-nya sangat sakit.",
   },
   prince: {
     name: "Prince", cost: 5, icon: "🏇", type: "unit",
     stats: { hp: 1615, dmg: 325, hitSpeed: 1.4, speed: 1.3, range: 0, targetType: 'ground-only' },
-    tags: ["ground", "mini_tank", "dps", "river-jumper"],
+    tags: ["ground", "mini_tank", "dps", "river-jumper", "melee", "single"],
     abilities: { charge: { speedMult: 2.0, dmg: 650, windup: 90 } },
-    visuals: { scale: 1.1, skin: "#f0ceab", head: "helmet", body: "armor_heavy", weapon: "lance", color: "#5e35b1" }, // Centaur body mungkin cocok? Tapi biarkan armor heavy
+    visuals: { scale: 1.1, skin: "#f0ceab", head: "helmet", body: "armor_heavy", weapon: "lance", color: "#5e35b1" },
     desc: "Double damage saat berlari kencang.",
   },
   dark_prince: {
     name: "Dark Prince", cost: 4, icon: "🔨", type: "unit",
+    // UPDATE: Melee 'cleave' confirmed. Frontal AoE[cite: 54].
     stats: { hp: 1030, shield: 199, dmg: 206, hitSpeed: 1.3, speed: 1.3, range: 0, targetType: 'ground-only', splashRadius: 2.0, meleeType: 'cleave' },
-    tags: ["ground", "mini_tank", "aoe", "shielded", "river-jumper"],
+    tags: ["ground", "mini_tank", "aoe", "shielded", "river-jumper", "melee"],
     abilities: { charge: { speedMult: 2.0, dmg: 412, windup: 90 } },
     visuals: { scale: 1.1, skin: "#f0ceab", head: "helmet_bucket", body: "armor_heavy", weapon: "mace", color: "#311b92" },
     desc: "Membawa perisai dan gada area.",
   },
   mega_knight: {
     name: "Mega Knight", cost: 7, icon: "🦍", type: "unit",
-    stats: { hp: 3300, dmg: 222, hitSpeed: 1.7, speed: 1.0, range: 0, targetType: 'ground-only', splashRadius: 2.0, deployTime: 2.5 },
-    tags: ["ground", "tank", "aoe", "heavy"],
+    // UPDATE: Melee 'cleave' added.
+    // NOTE: This is an "All-Rounder" (Tank + AoE + Jump). 
+    // Demerit: Cost is high (7) and Damage per hit is moderate compared to PEKKA[cite: 5].
+    stats: { hp: 3300, dmg: 222, hitSpeed: 1.7, speed: 1.0, range: 0, targetType: 'ground-only', splashRadius: 2.0, deployTime: 2.5, meleeType: 'cleave' },
+    tags: ["ground", "tank", "aoe", "heavy", "melee"],
     effects: { onSpawn: [{ type: 'damage', amount: 444, radius: 3.0 }] },
     abilities: { jumpAttack: { minRange: 3.5, maxRange: 5.0, dmg: 444, speed: 1.5, radius: 2.5 } },
     visuals: { scale: 1.2, skin: "#37474f", head: "helmet_full", body: "armor_heavy", weapon: "mace_hands", accessory: "cape_tattered", color: "#212121" },
@@ -126,22 +134,22 @@ const CARDS = {
   },
   pekka: {
     name: "P.E.K.K.A", cost: 7, icon: "🤖", type: "unit",
-    stats: { hp: 3125, dmg: 678, hitSpeed: 1.8, speed: 0.6, range: 0, targetType: 'ground-only' },
-    tags: ["ground", "tank", "dps", "tank_killer", "heavy"],
+    stats: { hp: 3400, dmg: 678, hitSpeed: 1.8, speed: 0.6, range: 0, targetType: 'ground-only' },
+    tags: ["ground", "tank", "dps", "tank_killer", "heavy", "melee", "single"],
     visuals: { scale: 1.4, skin: "#37474f", head: "robot_horn", body: "armor_heavy", weapon: "dual_swords", color: "#5c6bc0" },
     desc: "Robot berat. Butterfly?",
   },
   elite_barbarians: {
     name: "Elite Barbs", cost: 6, icon: "😡", type: "unit",
     stats: { hp: 1100, dmg: 300, hitSpeed: 1.4, speed: 1.8, range: 0, count: 2, targetType: 'ground-only' },
-    tags: ["ground", "dps", "fast", "tank_killer"],
+    tags: ["ground", "dps", "fast", "tank_killer", "melee", "single"],
     visuals: { scale: 1.1, skin: "#f0ceab", head: "helmet_viking", body: "shirt_plaid", weapon: "sword", color: "#ffb74d" },
     desc: "Dua barbarian sangat cepat.",
   },
   lumberjack: {
     name: "Lumberjack", cost: 4, icon: "🪵", type: "unit",
     stats: { hp: 1060, dmg: 200, hitSpeed: 0.8, speed: 1.8, range: 0, targetType: 'ground-only' },
-    tags: ["ground", "dps", "fast", "support"],
+    tags: ["ground", "dps", "fast", "support", "melee", "single"],
     effects: { onDeath: [{ type: 'spell', spell: "rage", radius: 5.0, duration: 3, amount: 0.4 }] },
     visuals: { scale: 1.0, skin: "#f0ceab", head: "hat_winter", body: "shirt_plaid", weapon: "axe_bottle", accessory: "backpack_survival", color: "#d32f2f" },
     desc: "Mati meninggalkan Rage.",
@@ -166,6 +174,7 @@ const CARDS = {
   },
   wizard: {
     name: "Wizard", cost: 5, icon: "🧙‍♂️", type: "unit",
+    // Ranged AoE: Damage turun 
     stats: { hp: 600, dmg: 234, hitSpeed: 1.4, speed: 1.0, range: 5.5, targetType: 'ground-air', splashRadius: 1.5, projectile: { type: 'magic_fire', speed: 8 } },
     tags: ["ground", "ranged", "aoe", "air_defense"],
     visuals: { scale: 1.0, skin: "#f0ceab", head: "hair_spiky", body: "robe", weapon: "magic_fire", accessory: "cape_royal", color: "#ff5722" },
@@ -204,6 +213,7 @@ const CARDS = {
   },
   princess: {
     name: "Princess", cost: 3, icon: "👸", type: "unit",
+    // Glass Cannon HP: 300-600[cite: 5]. Princess extrim (HP 216), Range extreme.
     stats: { hp: 216, dmg: 140, hitSpeed: 3.0, speed: 1.0, range: 9.0, sightRange: 12, targetType: 'ground-air', splashRadius: 2.5, projectile: { type: 'bow_fire', speed: 9 } },
     tags: ["ground", "ranged", "aoe", "air_defense", "siege", "glass_cannon"],
     visuals: { scale: 0.9, skin: "#f0ceab", head: "tiara", body: "robe", weapon: "bow_fire", accessory: "cape_royal", color: "#e65100" },
@@ -218,9 +228,10 @@ const CARDS = {
   },
   baby_dragon: {
     name: "Baby Dragon", cost: 4, icon: "🐲", type: "unit",
+    // Tank Air. HP lebih rendah dari Tank darat.
     stats: { hp: 1000, dmg: 133, hitSpeed: 1.5, speed: 1.1, range: 3.5, targetType: 'ground-air', splashRadius: 1.5, projectile: { type: 'spit_fire', speed: 9 } },
     tags: ["air", "ranged", "aoe", "tank", "air_defense"],
-    visuals: { scale: 1.2, skin: "#4caf50", head: "helmet_viking", body: "dragon", weapon: "none", accessory: "wings_dragon", color: "#4caf50" }, // Helm viking di naga? lucu.
+    visuals: { scale: 1.2, skin: "#4caf50", head: "helmet_viking", body: "dragon", weapon: "none", accessory: "wings_dragon", color: "#4caf50" },
     desc: "Unit udara area yang cukup tebal.",
   },
   inferno_dragon: {
@@ -247,7 +258,7 @@ const CARDS = {
   bats: {
     name: "Bats", cost: 2, icon: "🧛", type: "unit",
     stats: { hp: 69, dmg: 64, hitSpeed: 1.1, speed: 1.7, range: 0, count: 5, targetType: 'ground-air' },
-    tags: ["air", "swarm", "fast", "cycle"],
+    tags: ["air", "swarm", "fast", "cycle", "melee", "single"],
     visuals: { scale: 0.6, skin: "#4a148c", head: "bat", body: "demon", weapon: "bite", accessory: "wings_demon", color: "#4a148c" },
     desc: "Pasukan udara murah dan cepat.",
   },
@@ -258,21 +269,21 @@ const CARDS = {
   skeletons: {
     name: "Skeletons", cost: 1, icon: "🦴", type: "unit",
     stats: { hp: 69, dmg: 64, hitSpeed: 1.0, speed: 1.4, range: 0, count: 3, targetType: 'ground-only' },
-    tags: ["ground", "swarm", "cycle", "distraction"],
+    tags: ["ground", "swarm", "cycle", "distraction", "melee", "single"],
     visuals: { scale: 0.7, skin: "#ffffff", head: "skull", body: "ribs", weapon: "dagger", color: "#eeeeee" },
     desc: "Tiga kerangka untuk distraksi.",
   },
   skeleton_army: {
     name: "Skarmy", cost: 3, icon: "☠️", type: "unit",
     stats: { hp: 69, dmg: 64, hitSpeed: 1.0, speed: 1.4, range: 0, count: 15, targetType: 'ground-only' },
-    tags: ["ground", "swarm", "dps", "tank_killer"],
+    tags: ["ground", "swarm", "dps", "tank_killer", "melee", "single"],
     visuals: { scale: 0.7, skin: "#ffffff", head: "skull", body: "ribs", weapon: "dagger", color: "#eeeeee" },
     desc: "Lautan kerangka. Hati-hati area damage.",
   },
   goblins: {
     name: "Goblins", cost: 2, icon: "👺", type: "unit",
     stats: { hp: 184, dmg: 103, hitSpeed: 1.1, speed: 1.6, range: 0, count: 3, targetType: 'ground-only' },
-    tags: ["ground", "swarm", "dps", "fast"],
+    tags: ["ground", "swarm", "dps", "fast", "melee", "single"],
     visuals: { scale: 0.8, skin: "#76ff03", head: "mohawk", body: "cloth", weapon: "dagger", color: "#43a047" },
     desc: "Tiga goblin cepat.",
   },
@@ -285,7 +296,8 @@ const CARDS = {
   },
   ice_spirit: {
     name: "Ice Spirit", cost: 1, icon: "🧊", type: "unit",
-    stats: { hp: 190, dmg: 95, hitSpeed: 0.1, speed: 1.5, range: 0, targetType: 'ground-air', splashRadius: 2.5 },
+    // Kamikaze splash always circular style, but technically specific logic.
+    stats: { hp: 190, dmg: 95, hitSpeed: 0.1, speed: 1.5, range: 0, targetType: 'ground-air', splashRadius: 2.5, meleeType: 'circular' },
     tags: ["ground", "cycle", "kamikaze", "control", "stun-effect"],
     effects: { onHit: [{ type: 'stun', duration: 1.5, visual: 'freeze' }] },
     visuals: { scale: 0.6, skin: "#b3e5fc", head: "spirit", body: "spirit", weapon: "none", color: "#b3e5fc" },
@@ -300,8 +312,8 @@ const CARDS = {
   },
   guards: {
     name: "Guards", cost: 3, icon: "🛡️", type: "unit",
-    stats: { hp: 67, shield: 199, dmg: 100, hitSpeed: 1.1, speed: 1.1, range: 1.5, count: 3, targetType: 'ground-only' },
-    tags: ["ground", "swarm", "shielded", "defense"],
+    stats: { hp: 67, shield: 199, dmg: 100, hitSpeed: 1.1, speed: 1.1, range: 1.5, count: 3, targetType: 'ground-only' }, // Range 1.5 = Long Melee
+    tags: ["ground", "swarm", "shielded", "defense", "melee", "single"],
     visuals: { scale: 0.8, skin: "#ffffff", head: "skull_helm", body: "ribs_armor", weapon: "spear", color: "#d4af37" },
     desc: "Kerangka elit dengan perisai.",
   },
@@ -340,8 +352,9 @@ const CARDS = {
     effects: { spawner: { unit: 'skeleton', count: 1, interval: 3.1 }, onDeath: [{ type: 'spawn', unit: 'skeleton', count: 4 }] },
     visuals: { scale: 1.0, body: "building_tombstone", head: "none", color: "#9e9e9e" }
   },
-  sparky: { // Sparky diangap unit tapi visualnya mesin
+  sparky: { 
     name: "Sparky", cost: 6, icon: "🔌", type: "unit",
+    // Sparky is ranged (4.5) so no meleeType needed.
     stats: { hp: 1200, dmg: 1100, hitSpeed: 4.0, speed: 0.8, range: 4.5, targetType: 'ground-only', splashRadius: 3.0, projectile: { type: 'magic_zap', speed: 12 } },
     tags: ["ground", "ranged", "aoe", "heavy", "tank_killer"],
     visuals: { scale: 1.3, skin: "#fbc02d", head: "coil", body: "machine_tank", weapon: "coil_gun", color: "#fbc02d" },
@@ -349,12 +362,13 @@ const CARDS = {
   },
 
   // =================================================================
-  // CUSTOM & SPECIAL UNITS (NEW VISUALS)
+  // CUSTOM & SPECIAL UNITS (REBALANCED)
   // =================================================================
   healer: {
     name: "Battle Healer", cost: 4, icon: "🧚", type: "unit",
+    // Mini Tank + Support. No AoE attack, single melee.
     stats: { hp: 1500, dmg: 123, hitSpeed: 1.5, speed: 1.0, range: 0, targetType: 'ground-only' },
-    tags: ["ground", "mini_tank", "support", "healer"],
+    tags: ["ground", "mini_tank", "support", "healer", "melee", "single"],
     effects: { onHit: [{ type: 'heal', amount: 60 }], aura: [{ type: 'heal', amount: 50, radius: 4, target: 'ally' }] },
     visuals: { scale: 1.0, skin: "#f8bbd0", head: "hair_long", body: "armor_plate", weapon: "sword_light", accessory: "wings_angel", color: "#f8bbd0" },
     desc: "Menyembuhkan diri sendiri dan teman.",
@@ -369,6 +383,7 @@ const CARDS = {
   },
   storm_caller: {
     name: "Storm Caller", cost: 5, icon: "🌩️", type: "unit",
+    // Stun is powerful (Control), AoE. Cost 5 matches.
     stats: { hp: 900, dmg: 185, hitSpeed: 1.8, speed: 1.1, range: 4.0, targetType: 'ground-air', splashRadius: 2.0, projectile: { type: 'instant', visual: 'lightning' } },
     tags: ["air", "ranged", "aoe", "control", "stun-effect"],
     effects: { onHit: [{ type: 'stun', duration: 0.5, visual: 'zap' }] },
@@ -377,16 +392,18 @@ const CARDS = {
   },
   flame_knight: {
     name: "Flame Knight", cost: 5, icon: "🔥", type: "unit",
-    stats: { hp: 1200, dmg: 180, hitSpeed: 1.4, speed: 1.1, range: 0, targetType: 'ground-only', splashRadius: 1.5 },
-    tags: ["ground", "mini_tank", "aoe"],
+    // UPDATE: Melee 'cleave' added.
+    // Cost 5 because Mini Tank + AoE + Aura Damage (Almost all-rounder).
+    stats: { hp: 1200, dmg: 180, hitSpeed: 1.4, speed: 1.1, range: 0, targetType: 'ground-only', splashRadius: 1.5, meleeType: 'cleave' },
+    tags: ["ground", "mini_tank", "aoe", "melee"],
     effects: { aura: [{ type: 'damage', amount: 50, radius: 2.5, target: 'enemy' }] },
-    visuals: { scale: 1.0, skin: "#f0ceab", head: "helmet_viking", body: "armor_heavy", weapon: "sword_light", accessory: "cape_tattered", color: "#ff5722" }, // Sword light tapi merah
+    visuals: { scale: 1.0, skin: "#f0ceab", head: "helmet_viking", body: "armor_heavy", weapon: "sword_light", accessory: "cape_tattered", color: "#ff5722" },
     desc: "Membakar musuh di sekitarnya.",
   },
   shadow_assassin: {
     name: "Shadow Assn", cost: 4, icon: "🗡️", type: "unit",
     stats: { hp: 750, dmg: 420, hitSpeed: 2.0, speed: 1.9, range: 0, targetType: 'ground-only', deployTime: 0.5 },
-    tags: ["ground", "dps", "fast", "glass_cannon"],
+    tags: ["ground", "dps", "fast", "glass_cannon", "melee", "single"],
     effects: { onSpawn: [{ type: 'damage', amount: 210, radius: 1.5 }] },
     visuals: { scale: 0.9, skin: "#424242", head: "hood_ninja", body: "cloth", weapon: "dual_dagger", accessory: "cape_tattered", color: "#212121" },
     desc: "Sangat cepat dan mematikan.",
@@ -401,8 +418,10 @@ const CARDS = {
   },
   frost_giant: {
     name: "Frost Giant", cost: 6, icon: "🧊", type: "unit",
-    stats: { hp: 3800, dmg: 190, hitSpeed: 1.8, speed: 0.6, range: 0, targetType: 'ground-only', splashRadius: 2.0 },
-    tags: ["ground", "tank", "aoe", "heavy", "control", "slow-effect"],
+    // UPDATE: Melee 'cleave' added.
+    // Tank + AoE + Control. Cost 6 is fair. Damage reduced slightly to fit Tank role (-25% logic).
+    stats: { hp: 3800, dmg: 160, hitSpeed: 1.8, speed: 0.6, range: 0, targetType: 'ground-only', splashRadius: 2.0, meleeType: 'cleave' },
+    tags: ["ground", "tank", "aoe", "heavy", "control", "slow-effect", "melee"],
     effects: { onHit: [{ type: 'slow', amount: 0.4, duration: 2.0 }], onDeath: [{ type: 'slow', amount: 0.5, duration: 3.0, radius: 4.0 }] },
     visuals: { scale: 1.6, skin: "#b3e5fc", head: "hat_winter", body: "body_ice_golem", weapon: "fist_ice", color: "#0288d1" },
     desc: "Raksasa es.",
@@ -417,8 +436,11 @@ const CARDS = {
   },
   titan: {
     name: "Titan", cost: 9, icon: "🗿", type: "unit",
-    stats: { hp: 5500, dmg: 350, hitSpeed: 2.0, speed: 0.4, range: 0, targetType: 'ground-only', splashRadius: 3.0, deployTime: 4 },
-    tags: ["ground", "win_condition", "tank", "heavy", "aoe"],
+    // UPDATE: Melee 'cleave' added.
+    // EXTREME UNIT: Tank + WinCon + AoE. Cost 9 is the demerit.
+    // Balancing: HP capped at 5000 (was 5500) to be closer to Guide limit (4500) but still Boss.
+    stats: { hp: 5000, dmg: 350, hitSpeed: 2.0, speed: 0.4, range: 0, targetType: 'ground-only', splashRadius: 3.0, deployTime: 4, meleeType: 'cleave' },
+    tags: ["ground", "win_condition", "tank", "heavy", "aoe", "melee"],
     effects: { onSpawn: [{ type: 'damage', amount: 500, radius: 4.0 }], onDeath: [{ type: 'damage', amount: 600, radius: 4.5 }, { type: 'stun', duration: 2.0, radius: 4.5 }] },
     visuals: { scale: 1.8, skin: "#5d4037", head: "ancient_helm", body: "ancient_armor", weapon: "fist_giant", accessory: "cape_tattered", color: "#3e2723" },
     desc: "Boss Unit. Lambat tapi pasti.",
@@ -443,8 +465,41 @@ const CARDS = {
     name: "Twin Gunner", cost: 4, icon: "🔫", type: "unit",
     stats: { hp: 600, dmg: 90, hitSpeed: 1.2, speed: 1.3, range: 5.5, targetType: 'ground-air', projectile: { type: 'normal', speed: 10, count: 2, spread: 1.2 } },
     tags: ["ground", "ranged", "dps"],
-    visuals: { scale: 0.9, skin: "#ffcc80", head: "hair_spiky", body: "cloth", weapon: "dual_dagger", accessory: "jetpack", color: "#673ab7" }, // Jetpack aksesoris
+    visuals: { scale: 0.9, skin: "#ffcc80", head: "hair_spiky", body: "cloth", weapon: "dual_dagger", accessory: "jetpack", color: "#673ab7" },
     desc: "Dual wield shooter.",
+  },
+
+  // buildings 
+  cannon: {
+    name: "Cannon", cost: 3, icon: "🔫", type: "building",
+    stats: { hp: 742, dmg: 128, range: 5.0, hitSpeed: 0.9, lifetime: 30, radius: 20, projectile: { type: 'normal', speed: 10 } },
+    tags: ["building", "defense", "ground-only"], color: "#555",
+    visuals: { scale: 1.0, body: "building_base_stone", head: "turret_cannon", color: "#555" }
+  },
+  tesla: {
+    name: "Tesla", cost: 4, icon: "⚡", type: "building",
+    stats: { hp: 954, dmg: 190, range: 5.0, hitSpeed: 1.1, lifetime: 35, radius: 20, projectile: { type: 'instant', visual: 'lightning' } },
+    tags: ["building", "defense", "air-target", "hide-when-idle"], 
+    visuals: { scale: 1.0, body: "tower_tesla", head: "none", color: "#0288d1" }
+  },
+  inferno_tower: {
+    name: "Inferno", cost: 5, icon: "🔥", type: "building",
+    stats: { hp: 1452, dmg: 35, range: 6.0, hitSpeed: 0.4, lifetime: 30, radius: 22, projectile: { type: 'instant', visual: 'beam' } },
+    tags: ["building", "defense", "air-target", "tank_killer", "ramp-damage"], 
+    visuals: { scale: 1.0, body: "tower_inferno", head: "tower_inferno", color: "#d32f2f" }
+  },
+  xbow: {
+    name: "X-Bow", cost: 6, icon: "🏹", type: "building",
+    stats: { hp: 1330, dmg: 26, range: 11.5, hitSpeed: 0.25, lifetime: 40, radius: 25, deployTime: 3.5, projectile: { type: 'normal', speed: 12 } },
+    tags: ["building", "win_condition", "siege", "ground-only"], 
+    visuals: { scale: 1.2, body: "building_base_wood", head: "turret_xbow", color: "#8e24aa" }
+  },
+  tombstone: {
+    name: "Tombstone", cost: 3, icon: "🪦", type: "building",
+    stats: { hp: 422, lifetime: 30, radius: 20 },
+    tags: ["building", "spawner", "distraction"],
+    effects: { spawner: { unit: 'skeleton', count: 1, interval: 3.1 }, onDeath: [{ type: 'spawn', unit: 'skeleton', count: 4 }] },
+    visuals: { scale: 1.0, body: "building_tombstone", head: "none", color: "#9e9e9e" }
   },
 
   // =================================================================

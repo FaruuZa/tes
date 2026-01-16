@@ -490,6 +490,7 @@ class Renderer {
             this.drawModularHead(ctx, headType, r, teamColor, {});
         }
         ctx.restore();
+        this.drawStatusOutline(ctx, t, t.radius + 5);
 
         // 5. VISUAL EFEK KHUSUS (INFERNO BEAM)
         // Digambar manual karena beam bukan bagian dari body/head
@@ -527,7 +528,7 @@ class Renderer {
         }
 
         // 6. STATUS OUTLINE (Stun/Freeze/Slow)
-        this.drawStatusOutline(ctx, t, r + 5);
+        // this.drawStatusOutline(ctx, t, r + 5);
 
         // 7. HP BAR
         ctx.restore(); // Restore context sebelum gambar HP bar (agar tidak ikut rotate/translate tower)

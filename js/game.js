@@ -42,19 +42,22 @@ class GameEngine {
   startBattle(deck) {
     this.reset();
     this.playerDeck = [...deck];
-    this.initArena();
-
-    // === TAMBAHKAN INI ===
-    // Pilih difficulty (bisa dari UI nanti)
-
+    
+    // === INIT BOT & DIFFICULTY ===
     const difficulty = this.selectedDifficulty || "normal";
     this.botCommander = new BotCommander(difficulty);
+    
+    // Biarkan Bot membuat decknya sendiri berdasarkan deck pemain
+    this.botDeck = this.botCommander.generateDeck(this.playerDeck);
+    
+    // Setup Hand & Queue Bot
+    const shufBot = [...this.botDeck].sort(() => Math.random() - 0.5);
+    this.botHand = shufBot.slice(0, 4);
+    this.botQueue = shufBot.slice(4);
+
+    this.initArena(); // Panggil init arena setelah deck siap
 
     requestAnimationFrame(this.loop);
-
-    // Hapus old bot interval
-    if (this.botInterval) clearInterval(this.botInterval);
-    // Tidak perlu lagi karena botCommander.makeDecision() dipanggil di loop
   }
 
   initArena() {
@@ -214,12 +217,10 @@ class GameEngine {
         // ---------------------------------------------
 
         const u = new Unit(spawnX, spawnY, team, key);
-        if (team !== 0) u.deployTimer = 0;
         this.units.push(u);
       }
     } else if (cardData.type === "building") {
       const b = new Building(x, y, team, key);
-      if (team !== 0) b.deployTimer = 0;
       this.buildings.push(b);
     }
   }
@@ -440,8 +441,12 @@ class GameEngine {
     } else {
       // Default (Fireball, Zap, Arrows)
       this.effects.push(new Effect(x, y, radius, effectColor));
-      if (key === "zap") this.dealAreaDamage(x, y, radius, dmg, team, "stun");
-      else this.dealAreaDamage(x, y, radius, dmg, team);
+      if (key === "zap") {
+          this.dealAreaDamage(x, y, radius, dmg, team, "damage"); // 1. DAMAGE
+          this.dealAreaDamage(x, y, radius, 0, team, "stun");     // 2. STUN
+      } else {
+          this.dealAreaDamage(x, y, radius, dmg, team);
+      }
     }
   }
 
