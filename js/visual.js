@@ -14,6 +14,39 @@ const VISUALS = {
             ctx.fillStyle = grad;
             ctx.beginPath(); ctx.moveTo(-r*0.6, 0); ctx.lineTo(r*0.6, 0); ctx.lineTo(r*0.4, r*0.5); ctx.lineTo(-r*0.4, r*0.5); ctx.fill();
         },
+        // --- VISUAL TOWER BARU ---
+        'tower_king': (ctx, r, color) => {
+            // Base Kotak Batu
+            ctx.fillStyle = '#90a4ae'; ctx.fillRect(-r*1.3, -r*1.3, r*2.6, r*2.6);
+            ctx.strokeStyle = '#546e7a'; ctx.lineWidth = 2; ctx.strokeRect(-r*1.3, -r*1.3, r*2.6, r*2.6);
+            // Platform
+            ctx.fillStyle = color; ctx.fillRect(-r, -r, r*2, r*2);
+            // Sudut Benteng
+            ctx.fillStyle = '#546e7a'; 
+            ctx.fillRect(-r*1.3, -r*1.3, r*0.6, r*0.6); ctx.fillRect(r*0.7, -r*1.3, r*0.6, r*0.6);
+            ctx.fillRect(-r*1.3, r*0.7, r*0.6, r*0.6); ctx.fillRect(r*0.7, r*0.7, r*0.6, r*0.6);
+        },
+        'tower_princess': (ctx, r, color) => {
+            // Base Bulat Batu
+            ctx.fillStyle = '#90a4ae'; ctx.beginPath(); ctx.arc(0, 0, r*1.2, 0, Math.PI*2); ctx.fill();
+            ctx.strokeStyle = '#546e7a'; ctx.lineWidth = 2; ctx.stroke();
+            // Turret
+            ctx.fillStyle = '#cfd8dc'; ctx.fillRect(-r*0.8, -r*0.8, r*1.6, r*1.6);
+            // Top Color
+            ctx.fillStyle = color; ctx.beginPath(); ctx.arc(0, 0, r*0.7, 0, Math.PI*2); ctx.fill();
+        },
+        'tower_tesla': (ctx, r, color) => {
+            // Base Mekanik
+            ctx.fillStyle = '#37474f'; ctx.fillRect(-r, -r, r*2, r*2);
+            ctx.fillStyle = '#0288d1'; ctx.fillRect(-r*0.5, -r*1.5, r, r*1.5); // Tiang
+            // Kumparan Listrik
+            ctx.strokeStyle = '#81d4fa'; ctx.lineWidth = 3;
+            ctx.beginPath(); ctx.moveTo(-r*0.5, -r*1.2); ctx.lineTo(r*0.5, -r*1.2); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(-r*0.5, -r*0.8); ctx.lineTo(r*0.5, -r*0.8); ctx.stroke();
+            // Bola Atas
+            ctx.fillStyle = '#e1f5fe'; ctx.beginPath(); ctx.arc(0, -r*1.5, r*0.4, 0, Math.PI*2); ctx.fill();
+        },
+        // --- VISUAL UNIT BARU ---
         'armor_heavy': (ctx, r, color) => { // PEKKA, MK
             const grad = ctx.createLinearGradient(-r, 0, r, 0);
             grad.addColorStop(0, '#111'); grad.addColorStop(0.5, color); grad.addColorStop(1, '#111');
@@ -75,7 +108,107 @@ const VISUALS = {
             ctx.strokeStyle = "#b71c1c"; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(0, -r*0.3); ctx.lineTo(0, r*0.9); ctx.stroke();
         },
         'wood_box': (ctx, r, color) => { ctx.fillStyle = '#8d6e63'; ctx.fillRect(-r*0.7, -r*0.7, r*1.4, r*1.4); },
-        'wood_mech': (ctx, r, color) => { ctx.fillStyle = '#8d6e63'; ctx.fillRect(-r*0.6, -r*0.6, r*1.2, r*1.2); }
+        'wood_mech': (ctx, r, color) => { ctx.fillStyle = '#8d6e63'; ctx.fillRect(-r*0.6, -r*0.6, r*1.2, r*1.2); },
+        // --- VISUAL BANGUNAN (BUILDINGS) ---
+        'tower_inferno': (ctx, r, color) => {
+            // Tangki Lava Bawah
+            ctx.fillStyle = '#3e2723'; ctx.beginPath(); ctx.arc(0, 0, r*1.2, 0, Math.PI*2); ctx.fill();
+            
+            // Jeruji Besi
+            ctx.strokeStyle = '#424242'; ctx.lineWidth = 4;
+            ctx.beginPath(); ctx.moveTo(-r, r); ctx.lineTo(0, -r*0.5); ctx.lineTo(r, r); ctx.stroke();
+            
+            // Inti Magma
+            const pulse = 1 + Math.sin(Date.now()/200) * 0.1;
+            ctx.fillStyle = '#ff5722'; ctx.beginPath(); ctx.arc(0, 0, r*0.6 * pulse, 0, Math.PI*2); ctx.fill();
+            ctx.fillStyle = '#ffeb3b'; ctx.beginPath(); ctx.arc(0, 0, r*0.3, 0, Math.PI*2); ctx.fill();
+        },
+
+        'tower_tesla': (ctx, r, color) => {
+            // Base Mekanik (Saat Aktif)
+            ctx.fillStyle = '#455a64'; ctx.fillRect(-r, -r, r*2, r*2);
+            ctx.fillStyle = '#263238'; ctx.fillRect(-r*0.7, -r*0.7, r*1.4, r*1.4);
+            
+            // Generator Listrik (Tiang)
+            ctx.fillStyle = '#b3e5fc'; ctx.fillRect(-r*0.3, -r*1.5, r*0.6, r*1.5);
+            
+            // Cincin Listrik
+            ctx.strokeStyle = '#0288d1'; ctx.lineWidth = 2;
+            ctx.beginPath(); ctx.moveTo(-r*0.6, -r*1.2); ctx.lineTo(r*0.6, -r*1.2); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(-r*0.5, -r*0.8); ctx.lineTo(r*0.5, -r*0.8); ctx.stroke();
+            
+            // Bola Elektro Atas
+            ctx.fillStyle = '#e1f5fe'; ctx.shadowColor = 'cyan'; ctx.shadowBlur = 10;
+            ctx.beginPath(); ctx.arc(0, -r*1.6, r*0.4, 0, Math.PI*2); ctx.fill();
+            ctx.shadowBlur = 0;
+        },
+
+        'tower_tesla_closed': (ctx, r, color) => {
+            // Visual Tesla Bersembunyi (Pintu Trapdoor Tertutup)
+            ctx.fillStyle = '#546e7a'; ctx.fillRect(-r, -r, r*2, r*2); // Frame luar
+            
+            // Pintu Kayu/Besi
+            ctx.fillStyle = '#37474f'; ctx.fillRect(-r*0.85, -r*0.85, r*1.7, r*1.7);
+            
+            // Garis Pintu
+            ctx.strokeStyle = '#263238'; ctx.lineWidth = 2;
+            ctx.beginPath(); ctx.moveTo(-r*0.85, -r*0.85); ctx.lineTo(r*0.85, r*0.85); ctx.stroke(); // Silang
+            ctx.beginPath(); ctx.moveTo(r*0.85, -r*0.85); ctx.lineTo(-r*0.85, r*0.85); ctx.stroke();
+            
+            // Engsel
+            ctx.fillStyle = '#cfd8dc'; 
+            ctx.fillRect(-r*0.9, -r*0.2, r*0.2, r*0.4);
+            ctx.fillRect(r*0.7, -r*0.2, r*0.2, r*0.4);
+        },
+
+        // --- GENERIC BUILDINGS ---
+        'building_base_stone': (ctx, r, color) => { // Cannon/Mortar Base
+            ctx.fillStyle = '#607d8b'; ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI*2); ctx.fill();
+            ctx.fillStyle = '#37474f'; ctx.beginPath(); ctx.arc(0, 0, r*0.7, 0, Math.PI*2); ctx.fill();
+            ctx.strokeStyle = '#263238'; ctx.lineWidth = 2; ctx.stroke();
+        },
+
+        'building_base_wood': (ctx, r, color) => { // X-Bow Base
+            ctx.fillStyle = '#8d6e63'; ctx.fillRect(-r, -r, r*2, r*2);
+            ctx.fillStyle = '#5d4037'; ctx.fillRect(-r*0.8, -r*0.8, r*1.6, r*1.6);
+            // Paku Sudut
+            ctx.fillStyle = '#bdbdbd'; 
+            [[ -0.8,-0.8], [0.8,-0.8], [-0.8,0.8], [0.8,0.8]].forEach(p => {
+                ctx.beginPath(); ctx.arc(p[0]*r, p[1]*r, 3, 0, Math.PI*2); ctx.fill();
+            });
+        },
+
+        'building_tombstone': (ctx, r, color) => {
+            // Batu Nisan
+            ctx.fillStyle = '#bdbdbd'; 
+            ctx.beginPath(); ctx.moveTo(-r*0.6, r*0.6); ctx.lineTo(-r*0.6, -r*0.4); 
+            ctx.quadraticCurveTo(0, -r, r*0.6, -r*0.4); ctx.lineTo(r*0.6, r*0.6); ctx.fill();
+            // Retakan
+            ctx.strokeStyle = '#616161'; ctx.lineWidth=2;
+            ctx.beginPath(); ctx.moveTo(0, -r*0.2); ctx.lineTo(-r*0.2, 0); ctx.lineTo(r*0.1, r*0.3); ctx.stroke();
+            // Tanah
+            ctx.fillStyle = '#3e2723'; ctx.beginPath(); ctx.ellipse(0, r*0.6, r*0.8, r*0.3, 0, 0, Math.PI*2); ctx.fill();
+        },
+
+        'building_furnace': (ctx, r, color) => {
+            // Tungku Besi Hitam
+            ctx.fillStyle = '#212121'; ctx.fillRect(-r*0.9, -r*0.9, r*1.8, r*1.8);
+            // Isi Magma
+            ctx.fillStyle = '#ff5722'; ctx.beginPath(); ctx.arc(0, 0, r*0.6, 0, Math.PI*2); ctx.fill();
+            // Kisi-kisi
+            ctx.strokeStyle = '#424242'; ctx.lineWidth = 3;
+            ctx.beginPath(); ctx.moveTo(-r*0.6, -r*0.6); ctx.lineTo(r*0.6, r*0.6); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(r*0.6, -r*0.6); ctx.lineTo(-r*0.6, r*0.6); ctx.stroke();
+        },
+
+        'building_hut': (ctx, r, color) => {
+            // Pondok Kayu
+            ctx.fillStyle = '#fbc02d'; ctx.fillRect(-r*0.8, -r*0.8, r*1.6, r*1.6); // Dinding
+            ctx.fillStyle = '#795548'; // Atap Segitiga
+            ctx.beginPath(); ctx.moveTo(-r*1.1, -r*0.5); ctx.lineTo(0, -r*1.6); ctx.lineTo(r*1.1, -r*0.5); ctx.fill();
+            // Pintu Gelap
+            ctx.fillStyle = '#3e2723'; ctx.beginPath(); ctx.arc(0, r*0.2, r*0.4, Math.PI, 0); ctx.fill();
+        }
     },
 
     // --- HEADS (KEPALA) ---
@@ -124,7 +257,58 @@ const VISUALS = {
         'hat_winter': (ctx, r, color) => { ctx.fillStyle = '#5c6bc0'; ctx.beginPath(); ctx.arc(0, -r*0.5, r*0.5, Math.PI, 0); ctx.fill(); ctx.fillStyle='#ffe0b2'; ctx.beginPath(); ctx.arc(0, -r*0.2, r*0.45, 0, Math.PI*2); ctx.fill(); },
         'bandana': (ctx, r, color) => { ctx.fillStyle = '#f44336'; ctx.fillRect(-r*0.5, -r*0.8, r, r*0.3); ctx.fillStyle='#76ff03'; ctx.beginPath(); ctx.arc(0, -r*0.3, r*0.5, 0, Math.PI*2); ctx.fill(); },
         'pig': (ctx, r, color) => { ctx.fillStyle = '#f48fb1'; ctx.beginPath(); ctx.arc(0, -r*0.3, r*0.5, 0, Math.PI*2); ctx.fill(); ctx.fillStyle='#f06292'; ctx.beginPath(); ctx.ellipse(0, -r*0.3, r*0.2, r*0.15, 0, 0, Math.PI*2); ctx.fill(); },
-        'ghillie': (ctx, r, color) => { ctx.fillStyle = '#33691e'; ctx.beginPath(); ctx.arc(0, -r*0.3, r*0.55, 0, Math.PI*2); ctx.fill(); }
+        'ghillie': (ctx, r, color) => { ctx.fillStyle = '#33691e'; ctx.beginPath(); ctx.arc(0, -r*0.3, r*0.55, 0, Math.PI*2); ctx.fill(); },
+        'king_crown': (ctx, r, color) => { 
+            ctx.fillStyle = '#ffe0b2'; ctx.beginPath(); ctx.arc(0, -r*0.3, r*0.5, 0, Math.PI*2); ctx.fill(); // Head
+            ctx.fillStyle = '#ffd700'; ctx.beginPath(); ctx.moveTo(-r*0.5, -r*0.5); ctx.lineTo(-r*0.2, -r*1.0); ctx.lineTo(0, -r*0.5); ctx.lineTo(r*0.2, -r*1.0); ctx.lineTo(r*0.5, -r*0.5); ctx.fill(); // Crown
+        },
+        'turret_cannon': (ctx, r, color) => {
+            // Meriam Hitam
+            ctx.fillStyle = '#212121'; ctx.fillRect(-r*0.3, -r*0.4, r*0.6, r*1.2); // Barrel body
+            ctx.fillStyle = '#424242'; ctx.beginPath(); ctx.arc(0, r*0.6, r*0.35, 0, Math.PI*2); ctx.fill(); // Base pivot
+            ctx.fillStyle = '#000'; ctx.beginPath(); ctx.arc(0, -r*0.4, r*0.2, 0, Math.PI*2); ctx.fill(); // Lobang
+        },
+        'turret_xbow': (ctx, r, color) => {
+            // Crossbow ungu/kayu
+            ctx.fillStyle = '#8d6e63'; ctx.fillRect(-r*0.2, -r*0.8, r*0.4, r*1.6); // Body panjang
+            // Busur
+            ctx.strokeStyle = '#ab47bc'; ctx.lineWidth=3; 
+            ctx.beginPath(); ctx.moveTo(-r, 0); ctx.quadraticCurveTo(0, -r*0.5, r, 0); ctx.stroke();
+            // Tali
+            ctx.strokeStyle = '#fff'; ctx.lineWidth=1;
+            ctx.beginPath(); ctx.moveTo(-r, 0); ctx.lineTo(0, r*0.5); ctx.lineTo(r, 0); ctx.stroke();
+        },
+        'turret_mortar': (ctx, r, color) => {
+            // Mortar Besar
+            ctx.fillStyle = '#78909c'; ctx.beginPath(); ctx.arc(0, 0, r*0.7, 0, Math.PI*2); ctx.fill();
+            ctx.fillStyle = '#37474f'; ctx.beginPath(); ctx.arc(0, 0, r*0.4, 0, Math.PI*2); ctx.fill(); // Lobang besar
+        },
+        'tower_inferno': (ctx, r, color) => {
+            // Cincin Penahan Lensa
+            ctx.strokeStyle = '#3e2723'; ctx.lineWidth = 3;
+            ctx.beginPath(); ctx.arc(0, 0, r*0.7, 0, Math.PI*2); ctx.stroke();
+            
+            // Lensa Magma Gelap
+            ctx.fillStyle = '#bf360c'; ctx.beginPath(); ctx.arc(0, 0, r*0.6, 0, Math.PI*2); ctx.fill();
+            
+            // Inti Panas (Berdenyut)
+            const pulse = 1 + Math.sin(Date.now() / 150) * 0.15;
+            ctx.fillStyle = '#ffeb3b'; ctx.shadowColor = '#ff5722'; ctx.shadowBlur = 15;
+            ctx.beginPath(); ctx.arc(0, 0, r*0.3 * pulse, 0, Math.PI*2); ctx.fill();
+            ctx.shadowBlur = 0;
+
+            // Fokus Arah (Segitiga kecil di depan)
+            ctx.fillStyle = '#5d4037'; 
+            ctx.beginPath(); ctx.moveTo(-r*0.3, -r*0.7); ctx.lineTo(0, -r*1.3); ctx.lineTo(r*0.3, -r*0.7); ctx.fill();
+        },
+        'helmet_laser': (ctx, r, color) => {
+            // Helm Cyberpunk
+            ctx.fillStyle = '#263238'; ctx.beginPath(); ctx.arc(0, -r*0.3, r*0.6, 0, Math.PI*2); ctx.fill();
+            // Visor Laser
+            ctx.fillStyle = '#ff4081'; ctx.shadowColor = '#ff4081'; ctx.shadowBlur = 10;
+            ctx.fillRect(-r*0.4, -r*0.4, r*0.8, r*0.2);
+            ctx.shadowBlur = 0;
+        },
     },
 
     // --- WEAPONS (SENJATA) ---
@@ -324,6 +508,13 @@ const VISUALS = {
         'dual_swords': (ctx, r, pos) => {
             ctx.translate(pos.x, pos.y - r*0.5);
             ctx.fillStyle = '#cfd8dc'; ctx.fillRect(-2, -r, 4, r*1.2); 
-        }
-    }
+        },
+        'laser_beam': (ctx, r, pos) => {
+            // Senjata Laser Bahu/Tangan
+            ctx.translate(pos.x, pos.y - r*0.5);
+            ctx.fillStyle = '#37474f'; ctx.fillRect(-2, -r, 4, r*1.2); // Gagang
+            ctx.fillStyle = '#ff4081'; ctx.beginPath(); ctx.arc(0, -r, 4, 0, Math.PI*2); ctx.fill(); // Emitter
+        },
+    },
+
 };

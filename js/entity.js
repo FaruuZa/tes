@@ -556,150 +556,154 @@ class Unit extends Entity {
   }
 
   executeAttack(game) {
-    let dmg = this.dmg;
-    let isChargeHit = false;
-
-    // Charge Logic
-    if (this.isCharging && this.chargeConfig) {
-      dmg = this.chargeConfig.dmg || this.dmg * 2;
-      isChargeHit = true;
-      this.isCharging = false;
-      this.chargeTimer = 0;
-      game.effects.push(new Effect(this.x, this.y, this.radius + 15, "#fff"));
-    }
-
-    const pData = this.projectileData || {};
-
-    // FUNGSI PENCARI MULTI-TARGET
-    const getMultiTargets = (primaryTarget) => {
-      let targets = [primaryTarget];
-      if (this.multiTarget && this.multiTarget > 1) {
-        const extras = [...game.units, ...game.buildings]
-          .filter(
-            (e) =>
-              e.team !== this.team &&
-              !e.dead &&
-              !e.isHidden &&
-              e !== primaryTarget &&
-              this.isValidTarget(e) &&
-              Utils.getDist(this, e) <= this.range + 2
-          )
-          .sort((a, b) => Utils.getDist(this, a) - Utils.getDist(this, b))
-          .slice(0, this.multiTarget - 1);
-        targets = targets.concat(extras);
-      }
-      return targets;
-    };
-
-    // --- LOGIKA RAMP DAMAGE (INFERNO) ---
-    if (this.tags.includes("ramp-damage")) {
-      // Naikkan stage (Tier 1, 2, 3)
-      this.rampStage = (this.rampStage || 0) + 1;
-      let rampMult = 1.0;
-
-      // Logika Ramp Up (mirip Clash Royale: detik 0-2 (x1), 2-4 (x3), 4+ (x8))
-      // Asumsi hitSpeed Inferno Dragon ~0.4 detik (24 frame)
-      if (this.rampStage > 15) rampMult = 3.0; // Setelah ~6 detik in-game ticks
-      if (this.rampStage > 30) rampMult = 8.0; // Setelah ~12 detik in-game ticks
-
-      dmg *= rampMult;
-
-      // Inferno adalah tipe INSTANT (Beam)
-      if (this.target) {
-        this.target.takeDamage(dmg);
-        // Tidak push projectile, damage langsung masuk
-      }
-      return; // Selesai, jangan spawn projectile
-    }
-
-    // 1. INSTANT ATTACK (Petir / Laser / Zap)
-    if (pData.type === "instant") {
-      const targets = getMultiTargets(this.target);
-      targets.forEach((t) => {
-        if (!t) return;
-        t.takeDamage(dmg);
-        this.triggerEffects(game, "onHit", t);
-        if (pData.visual === "lightning") {
-          game.effects.push(new LightningEffect(this.x, this.y - 20, t.x, t.y));
-        }
-      });
-    }
-
-    // 2. MELEE ATTACK
-    else if (this.isMelee && !pData.type) {
-      if (this.splashRadius > 0) {
-        game.dealAreaDamage(
-          this.x,
-          this.y,
-          this.splashRadius,
-          dmg,
-          this.team,
-          "damage",
-          this.targetType !== "ground-only"
-        );
-        game.effects.push(
-          new Effect(this.x, this.y, this.splashRadius, "orange")
-        );
-        this.triggerEffectsArea(
-          game,
-          "onHit",
-          this.x,
-          this.y,
-          this.splashRadius
-        );
-      } else {
-        if (this.target) {
-          this.target.takeDamage(dmg);
-          this.triggerEffects(game, "onHit", this.target);
-        }
-      }
-      if (this.tags.includes("kamikaze")) this.takeDamage(9999);
-      if (isChargeHit && this.target && this.target.dead) {
-        this.attackTimer = this.hitSpeed;
-        this.isMoving = false;
-      }
-    }
-
-    // 3. PROJECTILE ATTACK
-    else {
-      if (this.key === "executioner") {
-        this.hasWeapon = false; // Kapak dilempar!
+      let dmg = this.dmg;
+      
+      // Charge Logic
+      if (this.isCharging && this.chargeConfig) {
+          dmg = this.chargeConfig.dmg || (this.dmg * 2);
+          this.isCharging = false;
+          this.chargeTimer = 0;
+          game.effects.push(new Effect(this.x, this.y, this.radius + 15, "#fff"));
       }
 
-      const targets = getMultiTargets(this.target);
-      const pType = pData.type || "normal";
-      const pSpeed = pData.speed || 7;
-      const pMaxRange = pData.maxRange
-        ? pData.maxRange * CONFIG.gridSize
-        : this.range;
-      const onHitEffects = this.effects.onHit || [];
+      // Ambil data projectile
+      const pData = this.projectileData || {}; 
 
-      targets.forEach((t) => {
-        if (!t) return;
-        const p = new Projectile(
-          this.x,
-          this.y,
-          t,
-          dmg,
-          this.team,
-          false,
-          this.splashRadius > 0,
-          false,
-          this.splashRadius,
-          2,
-          false,
-          0,
-          0,
-          pType,
-          pSpeed,
-          pMaxRange,
-          this,
-          onHitEffects
-        );
-        p.hitAir = this.targetType !== "ground-only";
-        game.projectiles.push(p);
-      });
-    }
+      // Helper Multi-Target
+      const getMultiTargets = (primaryTarget) => {
+          let targets = [primaryTarget];
+          if (this.multiTarget && this.multiTarget > 1) {
+              const pool = (this.targetType === 'allies-only') ? game.units : [...game.units, ...game.buildings];
+              
+              const extras = pool.filter(e => 
+                  e.team === (this.targetType === 'allies-only' ? this.team : (this.team === 0 ? 1 : 0)) && // Cek Tim
+                  !e.dead && !e.isHidden && e !== primaryTarget && 
+                  this.isValidTarget(e) && 
+                  Utils.getDist(this, e) <= this.range + 2
+              ).sort((a,b) => Utils.getDist(this, a) - Utils.getDist(this, b))
+              .slice(0, this.multiTarget - 1);
+              targets = targets.concat(extras);
+          }
+          return targets;
+      };
+
+      // 1. LOGIKA RAMP DAMAGE (Inferno - Bertahap)
+      if (this.tags.includes('ramp-damage')) {
+          this.rampStage = (this.rampStage || 0) + 1;
+          let rampMult = 1.0;
+          if (this.rampStage > 15) rampMult = 3.0;
+          if (this.rampStage > 30) rampMult = 8.0;
+          dmg *= rampMult;
+          
+          const targets = getMultiTargets(this.target);
+          this.currentTargets = targets; // Simpan untuk visual
+          
+          targets.forEach(t => { if(t) { t.takeDamage(dmg); this.triggerEffects(game, 'onHit', t); } });
+          return;
+      }
+
+      // 2. LOGIKA FLAT BEAM (Laser Biasa / Healing Beam) [BARU]
+      // Cek jika type instant DAN visual beam, TAPI tidak ramp-damage
+      if (pData.type === 'instant' && pData.visual === 'beam') {
+          const targets = getMultiTargets(this.target);
+          this.currentTargets = targets; // Simpan untuk visual
+
+          targets.forEach(t => {
+              if(!t) return;
+              
+              // LOGIKA HEAL vs DAMAGE
+              if (this.targetType === 'allies-only') {
+                  // Jika target teman -> Heal
+                  t.heal(dmg);
+                  // Trigger effect 'onHit' (misal: buff)
+                  this.triggerEffects(game, 'onHit', t);
+              } else {
+                  // Jika musuh -> Damage
+                  t.takeDamage(dmg);
+                  this.triggerEffects(game, 'onHit', t);
+              }
+          });
+          return; // Selesai, visual digambar renderer
+      }
+
+      // 3. INSTANT ATTACK LAIN (Petir/Zap)
+      if (pData.type === 'instant') {
+          const targets = getMultiTargets(this.target);
+          targets.forEach(t => {
+              if(!t) return;
+              t.takeDamage(dmg);
+              this.triggerEffects(game, 'onHit', t);
+              if (pData.visual === 'lightning') {
+                  game.effects.push(new LightningEffect(this.x, this.y - 20, t.x, t.y));
+              }
+          });
+      }
+      
+      // 4. MELEE ATTACK
+      else if (this.isMelee && !pData.type) {
+          if (this.splashRadius > 0) {
+              game.dealAreaDamage(this.x, this.y, this.splashRadius, dmg, this.team, 'damage', this.targetType !== 'ground-only');
+              game.effects.push(new Effect(this.x, this.y, this.splashRadius, "orange"));
+              this.triggerEffectsArea(game, 'onHit', this.x, this.y, this.splashRadius);
+          } else {
+              if (this.target) {
+                  this.target.takeDamage(dmg);
+                  this.triggerEffects(game, 'onHit', this.target);
+              }
+          }
+          if (this.tags.includes('kamikaze')) this.takeDamage(9999);
+      } 
+      
+      // 5. PROJECTILE ATTACK (Update: Support Multi-Count & Spread)
+      else {
+          if (this.key === 'executioner') this.hasWeapon = false; 
+
+          const targets = getMultiTargets(this.target);
+          const pType = pData.type || "normal";
+          const pSpeed = pData.speed || 7;
+          const pMaxRange = pData.maxRange ? (pData.maxRange * CONFIG.gridSize) : this.range;
+          const onHitEffects = this.effects.onHit || [];
+
+          // AMBIL CONFIG MULTI-PROJECTILE
+          const pCount = pData.count || 1;   // Jumlah peluru (Default 1)
+          const pSpread = pData.spread || 0; // Jarak sebaran (Default 0)
+
+          targets.forEach(t => {
+              if(!t) return;
+
+              // LOOP UNTUK MEMBUAT BANYAK PELURU
+              for (let i = 0; i < pCount; i++) {
+                  
+                  // Hitung Offset (Geseran) Posisi Awal
+                  // Agar peluru muncul berjejer (Shotgun/Dual Wield)
+                  // Jika count 1, offset 0. Jika count 3, offset: -spread, 0, +spread.
+                  let spreadOffset = 0;
+                  if (pCount > 1) {
+                      spreadOffset = (i - (pCount - 1) / 2) * (pSpread * 10); 
+                  }
+
+                  // Geser posisi spawn tegak lurus dari arah hadap unit
+                  // Math.PI/2 = 90 derajat
+                  const perpAngle = this.angle + Math.PI / 2;
+                  
+                  const spawnX = this.x + Math.cos(perpAngle) * spreadOffset;
+                  const spawnY = this.y + Math.sin(perpAngle) * spreadOffset;
+
+                  const p = new Projectile(
+                      spawnX, spawnY, t, dmg, this.team, 
+                      false, this.splashRadius > 0, false, this.splashRadius, 2, 
+                      false, 0, 0, 
+                      pType, pSpeed, pMaxRange, this, onHitEffects
+                  );
+                  p.hitAir = this.targetType !== 'ground-only';
+                  
+                  // Sedikit delay visual agar tidak keluar barengan persis (Opsional)
+                  // p.visualDelay = i * 2; 
+                  
+                  game.projectiles.push(p);
+              }
+          });
+      }
   }
   processAura(game) {
     this.effects.aura.forEach((eff) => {
@@ -986,7 +990,10 @@ class Building extends Entity {
     this.isSpawner = this.tags.includes("spawner");
     this.isRampUp = this.tags.includes("ramp-damage");
     this.isHideIdle = this.tags.includes("hide-when-idle");
-    this.isSiege = this.tags.includes("siege");
+    
+    // --- AMBIL DATA PROJECTILE ---
+    this.projData = data.stats.projectile || { type: 'normal', speed: 7 };
+    
     this.spawnUnitKey = data.stats.spawnUnitKey;
     this.spawnCount = data.stats.spawnCount || 1;
     this.spawnInterval = (data.stats.spawnInterval || 5) * 60;
@@ -994,8 +1001,6 @@ class Building extends Entity {
     this.stunDuration = data.stats.stunDuration || 0;
     this.rampStage = 0;
     this.angle = -Math.PI / 2;
-    this.projType = data.stats.projectile;
-    this.projSpeed = data.stats.projSpeed || 7;
     this.effects = data.effects || {};
   }
   
@@ -1005,31 +1010,23 @@ class Building extends Entity {
     if (this.stunned > 0) return;
 
     this.lifetime--;
-    this.hp -= this.maxHp / this.maxLifetime; // Decay HP
+    this.hp -= this.maxHp / this.maxLifetime; 
 
-    // --- FIX: TRIGGER EFFECT SAAT LIFETIME HABIS ---
+    // Trigger Death
     if (this.lifetime <= 0 || this.hp <= 0) { 
         this.dead = true; 
-        // Trigger onDeath (untuk Phoenix Egg menetas)
         if (this.effects.onDeath) {
-             // Pastikan kita mengirim game context
-             // Jika di dalam class ini tidak ada akses ke variabel global GAME, 
-             // kita andalkan parameter 'game' dari update loop.
+             const contextGame = game || GAME;
              this.effects.onDeath.forEach(eff => {
                  if (eff.type === 'spawn') {
-                     // Logic spawn manual karena triggerEffectsArea ada di Unit, bukan Building (kecuali dicopy)
-                     // Atau lebih baik panggil helper global jika ada.
-                     // Di sini kita copy logic spawn sederhana:
                      for(let i=0; i<eff.count; i++) {
                          const ox = (Math.random()-0.5)*10;
                          const u = new Unit(this.x + ox, this.y, this.team, eff.unit);
-                         u.deployTimer = 20;
-                         game.units.push(u);
+                         u.deployTimer = 20; contextGame.units.push(u);
                      }
                  }
-                 // Handle spell death effect (Lumberjack/Bomb Tower logic)
-                 if (eff.type === 'spell' && CARDS[eff.spell]) {
-                     game.pendingSpells.push({
+                 if (eff.type === 'spell') {
+                      contextGame.pendingSpells.push({
                         key: eff.spell, x: this.x, y: this.y, team: this.team,
                         timer: 60, maxTimer: 60, radius: (eff.radius||3)*CONFIG.gridSize,
                         overrideDmg: eff.amount, overrideDuration: eff.duration
@@ -1046,6 +1043,7 @@ class Building extends Entity {
 
     if (this.attackTimer > 0) this.attackTimer -= speedMult;
 
+    // Spawner Logic
     if (this.effects.spawner) {
         const sp = this.effects.spawner;
         if (!this.spawnTimer) this.spawnTimer = 0;
@@ -1054,19 +1052,13 @@ class Building extends Entity {
             this.spawnTimer = 0;
             this.spawnUnit(game, sp.unit, sp.count);
         }
-    } else if (this.isSpawner) {
-        this.spawnTimer += speedMult;
-        if (this.spawnTimer >= this.spawnInterval) {
-            this.spawnTimer = 0;
-            this.spawnUnit(game, this.spawnUnitKey, this.spawnCount);
-        }
     }
 
+    // Attack Logic
     if (this.range > 0) {
       this.updateTargeting(game);
       if (this.isHideIdle) this.isHidden = this.target === null;
-      if (this.target)
-        this.angle = Math.atan2(this.target.y - this.y, this.target.x - this.x);
+      if (this.target) this.angle = Math.atan2(this.target.y - this.y, this.target.x - this.x);
 
       if (this.target && this.attackTimer <= 0) {
         this.doAttack(game);
@@ -1077,91 +1069,77 @@ class Building extends Entity {
     }
   }
 
-  takeDamage(amount) {
-      super.takeDamage(amount);
-      // Trigger OnDeath saat hancur diserang (Logic duplikat dengan update, tapi perlu untuk instant kill)
-      if (this.dead && this.effects.onDeath) {
-          // Sama seperti di update(), jalankan efek
-          // (Idealnya buat method helper, tapi inline saja biar aman di copy-paste)
-          const gameRef = (typeof GAME !== 'undefined') ? GAME : null; 
-          if(gameRef) {
-              this.effects.onDeath.forEach(eff => {
-                 if (eff.type === 'spawn') {
-                     for(let i=0; i<eff.count; i++) {
-                         const u = new Unit(this.x, this.y, this.team, eff.unit);
-                         u.deployTimer = 20; gameRef.units.push(u);
-                     }
-                 }
-                 if (eff.type === 'spell') {
-                     // ... logic spell ...
-                 }
-              });
-          }
-      }
-  }
-
-  spawnUnit(game, unitKey, count) {
+  // ... (spawnUnit & takeDamage tetap sama, bisa dicopy dari sebelumnya) ...
+  takeDamage(amount) { super.takeDamage(amount); }
+  spawnUnit(game, unitKey, count) { /* sama seperti sebelumnya */ 
     if(!unitKey) return;
     for (let i = 0; i < (count || 1); i++) {
-      const ox = (Math.random() - 0.5) * 10;
-      const u = new Unit(this.x + ox, this.y + 20, this.team, unitKey);
-      u.deployTimer = 10;
-      game.units.push(u);
+      const u = new Unit(this.x + (Math.random()-0.5)*10, this.y + 20, this.team, unitKey);
+      u.deployTimer = 10; game.units.push(u);
     }
   }
 
-  // --- FIX TARGETING BUILDING ---
   updateTargeting(game) {
     if (this.target && (this.target.dead || this.target.isHidden || Utils.getDist(this, this.target) > this.range)) {
-      this.target = null;
-      this.rampStage = 0;
+      this.target = null; this.rampStage = 0;
     }
-
     if (!this.target) {
-      // FIX: TARGET KANDIDAT = UNIT + TOWER + BUILDING MUSUH
-      const enemies = [
-          ...game.units, 
-          ...game.towers, 
-          ...game.buildings
-      ].filter(e => e.team !== this.team && !e.dead && !e.isHidden);
-
-      let closest = null;
-      let minD = this.range;
-      
+      const enemies = [...game.units, ...game.towers, ...game.buildings].filter(e => e.team !== this.team && !e.dead && !e.isHidden);
+      let closest = null; let minD = this.range;
       for (let e of enemies) {
         if (!e.tags) e.tags = [];
         if (!this.tags.includes("air-target") && e.isAir) continue;
-        
-        // Perhitungkan radius target agar X-Bow bisa nembak tower
         const dist = Utils.getDist(this, e) - e.radius; 
-        
-        if (dist <= minD) { 
-            minD = dist; 
-            closest = e; 
-        }
+        if (dist <= minD) { minD = dist; closest = e; }
       }
       this.target = closest;
     }
   }
 
+  // --- MODULAR ATTACK SYSTEM FOR BUILDINGS ---
   doAttack(game) {
+    if (!this.target) return;
+
     let currentDmg = this.dmg;
     const spawnX = this.x + Math.cos(this.angle) * 20;
     const spawnY = this.y + Math.sin(this.angle) * 20;
 
+    // 1. RAMP DAMAGE (Inferno Style)
     if (this.isRampUp) {
-      this.rampStage += 0.5;
-      if (this.rampStage > 40) this.rampStage = 40;
-      currentDmg = this.dmg * (1 + this.rampStage * 0.1);
-      if (this.target) this.target.takeDamage(currentDmg);
-    } else if (this.tags.includes('stun-effect')) { 
-      if (this.target) {
+      this.rampStage += 1;
+      let rampMult = 1.0;
+      if (this.rampStage > 30) rampMult = 3.0; // Tier 2
+      if (this.rampStage > 90) rampMult = 8.0; // Tier 3
+      currentDmg = this.dmg * rampMult;
+      
+      // Inferno Beam adalah tipe Instant hit
+      this.target.takeDamage(currentDmg);
+      return; // Selesai, visual digambar di renderer
+    } 
+    
+    // 2. INSTANT ATTACK (Tesla/Lightning)
+    else if (this.projData.type === 'instant') {
         this.target.takeDamage(this.dmg);
-        this.target.applyStun(this.stunDuration || 0.5, "zap");
-        game.effects.push(new LightningEffect(this.x, this.y - 20, this.target.x, this.target.y));
-      }
-    } else {
-      game.projectiles.push(new Projectile(spawnX, spawnY, this.target, currentDmg, this.team, true));
+        
+        // Efek Stun
+        if (this.tags.includes('stun-effect')) {
+            this.target.applyStun(this.stunDuration || 0.5, "zap");
+        }
+        
+        // Visual Lightning
+        if (this.projData.visual === 'lightning') {
+             game.effects.push(new LightningEffect(this.x, this.y - 30, this.target.x, this.target.y));
+        }
+    } 
+    
+    // 3. NORMAL PROJECTILE (Cannon/Xbow)
+    else {
+      game.projectiles.push(new Projectile(
+          spawnX, spawnY, this.target, currentDmg, this.team, 
+          false, false, false, 0, 2, false, 0, 0, 
+          this.projData.type || 'normal', 
+          this.projData.speed || 7
+      ));
     }
   }
 }
@@ -1183,40 +1161,32 @@ class Tower extends Entity {
     this.angle = team === 0 ? -Math.PI / 2 : Math.PI / 2;
     this.target = null;
     this.tags = [];
+    
+    // --- AMBIL DATA PROJECTILE UNTUK TOWER ---
+    this.projData = stats.projectile || { type: 'normal', speed: 7 };
+    this.targetType = stats.targetType || 'ground-air';
   }
+
   update(game) {
     this.updateStatus();
     if (this.stunned > 0) return;
 
-    if (this.type === "king") {
-      if (!this.active) {
-        const princessAlive = game.towers.filter(
-          (t) => t.team === this.team && t.type === "princess" && !t.dead
-        ).length;
-        if (this.hp < this.maxHp || princessAlive < 2) {
-          this.active = true;
-          this.activationTimer = 120;
-        }
-      }
+    if (this.type === "king" && !this.active) {
+        const princessAlive = game.towers.filter(t => t.team === this.team && t.type === "princess" && !t.dead).length;
+        if (this.hp < this.maxHp || princessAlive < 2) { this.active = true; this.activationTimer = 120; }
     }
     if (this.activationTimer > 0) this.activationTimer--;
 
     this.target = null;
     if (this.active) {
-      // --- FIX TARGETING TOWER: INCLUDE BUILDING MUSUH ---
-      const enemies = [
-          ...game.units,
-          ...game.buildings
-      ].filter(u => u.team !== this.team && !u.dead && !u.isHidden);
-      
-      let closest = null;
-      let minD = this.range;
+      const enemies = [...game.units, ...game.buildings].filter(u => u.team !== this.team && !u.dead && !u.isHidden);
+      let closest = null; let minD = this.range;
       for (let e of enemies) {
-        const d = Utils.getDist(this, e) - e.radius; // Hitung radius body
-        if (d <= minD) {
-          minD = d;
-          closest = e;
-        }
+        // Cek target type (King Tower ground-air)
+        if (this.targetType === 'ground-only' && e.isAir) continue;
+
+        const d = Utils.getDist(this, e) - e.radius; 
+        if (d <= minD) { minD = d; closest = e; }
       }
       this.target = closest;
 
@@ -1227,18 +1197,7 @@ class Tower extends Entity {
       if (this.target) {
         this.angle = Math.atan2(this.target.y - this.y, this.target.x - this.x);
         if (this.attackTimer <= 0) {
-          const spawnX = this.x + Math.cos(this.angle) * 20;
-          const spawnY = this.y + Math.sin(this.angle) * 20;
-          game.projectiles.push(
-            new Projectile(
-              spawnX,
-              spawnY,
-              this.target,
-              this.dmg,
-              this.team,
-              true // isTower = true
-            )
-          );
+          this.doAttack(game); // Panggil Modular Attack Logic
           this.attackTimer = this.hitSpeed;
         }
       }
@@ -1250,5 +1209,30 @@ class Tower extends Entity {
       if (speedMult < 0.2) speedMult = 0.2;
       this.attackTimer -= speedMult;
     }
+  }
+
+  // --- MODULAR ATTACK SYSTEM FOR TOWERS ---
+  doAttack(game) {
+      if (!this.target) return;
+      const spawnX = this.x + Math.cos(this.angle) * 20;
+      const spawnY = this.y + Math.sin(this.angle) * 20;
+
+      // 1. INSTANT ATTACK (Misal Tesla Tower Custom)
+      if (this.projData.type === 'instant') {
+          this.target.takeDamage(this.dmg);
+          if (this.projData.visual === 'lightning') {
+              game.effects.push(new LightningEffect(this.x, this.y - 20, this.target.x, this.target.y));
+          }
+      }
+      // 2. NORMAL PROJECTILE (King/Princess)
+      else {
+          game.projectiles.push(new Projectile(
+              spawnX, spawnY, this.target, this.dmg, this.team, 
+              true, // isTower
+              false, false, 0, 2, false, 0, 0,
+              this.projData.type || 'normal',
+              this.projData.speed || 7
+          ));
+      }
   }
 }

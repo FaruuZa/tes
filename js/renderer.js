@@ -68,7 +68,7 @@ class Renderer {
         // 1. AREA DAMAGE INDICATOR (Lingkaran Putih/Merah putus-putus)
         if (!isGhost && entity.splashRadius > 0) {
             ctx.save();
-            ctx.strokeStyle = entity.team === 0 ? "rgba(255, 255, 255, 0.2)" : "rgba(255, 0, 0, 0.2)";
+            ctx.strokeStyle = entity.team === 0 ? "rgb(255, 255, 255)" : "rgb(255, 0, 0)";
             ctx.lineWidth = 1;
             ctx.setLineDash([4, 4]);
             ctx.beginPath();
@@ -127,30 +127,70 @@ class Renderer {
 
         ctx.restore();
 
-        // Inferno Laser Beam
-        if (!isGhost && entity.key === 'inferno_dragon' && entity.target && !entity.target.dead && entity.stunned <= 0) {
-             const dist = Utils.getDist(entity, entity.target);
-             if (dist <= entity.range + entity.target.radius + 10) {
+        // =========================================================
+        // VISUAL BEAM (MULTI-TARGET SUPPORT: DAMAGE & HEAL)
+        // =========================================================
+        
+        // Ambil data kartu untuk cek tipe projectile visual
+        const cardData = CARDS[entity.key];
+        const isBeam = (entity.tags && entity.tags.includes('ramp-damage')) || 
+                       (cardData && cardData.stats.projectile && cardData.stats.projectile.visual === 'beam');
+        
+        const isReady = !isGhost && !entity.dead && entity.stunned <= 0;
+
+        const targetsToDraw = (entity.currentTargets && entity.currentTargets.length > 0) 
+                              ? entity.currentTargets 
+                              : (entity.target ? [entity.target] : []);
+
+        if (isBeam && isReady && targetsToDraw.length > 0) {
+             targetsToDraw.forEach(target => {
+                 if (!target || target.dead) return;
+
+                 const dist = Utils.getDist(entity, target);
+                 if (dist > entity.range + target.radius + 40) return;
+
                  ctx.save();
                  ctx.translate(0, jumpOffset);
-                 ctx.strokeStyle = "#ff9100";
-                 // Semakin lama nembak (rampStage naik), laser makin tebal
-                 const thickness = Math.min(8, 2 + (entity.rampStage || 0) * 0.2);
-                 ctx.lineWidth = thickness;
                  
-                 // Efek getar laser
+                 // --- WARNA BEAM ---
+                 let baseColor, hotColor, coreColor;
+
+                 // 1. Tipe Healer (Target Teman)
+                 if (entity.targetType === 'allies-only') {
+                     baseColor = "#00e676"; // Hijau
+                     hotColor  = "#69f0ae"; // Hijau Terang
+                     coreColor = "#ffffff"; // Putih
+                 } 
+                 // 2. Tipe Laser Master (Pink)
+                 else if (entity.key === 'laser_master') {
+                     baseColor = "#ff4081"; hotColor = "#f50057"; coreColor = "#ff80ab";
+                 }
+                 // 3. Tipe Inferno / Default (Orange/Merah)
+                 else {
+                     baseColor = "#ff9100"; hotColor = "#d84315"; coreColor = "#ffff00";
+                 }
+
+                 const stage = entity.rampStage || 0;
+                 // Jika tidak punya ramp (flat beam), stage selalu 0, jadi warna stabil
+                 ctx.strokeStyle = stage > 30 ? hotColor : baseColor;
+                 const thickness = Math.min(8, 2 + stage * 0.2); // Ketebalan stabil jika stage 0
+                 
+                 ctx.lineWidth = thickness;
                  const jitter = (Math.random() - 0.5) * thickness;
                  
+                 // Draw Line
                  ctx.beginPath(); 
                  ctx.moveTo(entity.x, entity.y - 15); 
-                 ctx.lineTo(entity.target.x + jitter, entity.target.y + jitter); 
+                 ctx.lineTo(target.x + jitter, target.y + jitter); 
                  ctx.stroke();
                  
-                 // Kilatan di target
-                 ctx.fillStyle = "yellow";
-                 ctx.beginPath(); ctx.arc(entity.target.x, entity.target.y, thickness*1.5, 0, Math.PI*2); ctx.fill();
+                 // Glow di Target
+                 ctx.fillStyle = coreColor;
+                 ctx.shadowColor = baseColor; ctx.shadowBlur = 10;
+                 ctx.beginPath(); ctx.arc(target.x, target.y, thickness * 1.5, 0, Math.PI*2); ctx.fill();
+                 
                  ctx.restore();
-             }
+             });
         }
 
         if (!isGhost) {
@@ -410,11 +450,21 @@ class Renderer {
         ctx.restore();
         if(t.type==='king' && !t.active) { ctx.fillStyle = '#fff'; ctx.font = "bold 20px Arial"; ctx.textAlign="center"; ctx.fillText("Zzz", t.x, t.y-35); }
         this.drawStatusOutline(ctx, t, t.radius + 5);
-        if (t.type === "inferno_tower" && t.active && t.target && !t.target.dead && t.stunned <= 0) {
-            const dist = Utils.getDist(t, t.target);
-            if (dist <= t.range + t.target.radius) {
-                ctx.save(); ctx.strokeStyle = "red"; ctx.lineWidth = Math.min(8, 2 + (120 - t.attackTimer) / 10); ctx.beginPath(); ctx.moveTo(t.x, t.y - 20); ctx.lineTo(t.target.x, t.target.y); ctx.stroke(); ctx.restore();
-            }
+        const isRamp = (t.tags && t.tags.includes('ramp-damage')) || t.type === 'inferno_tower';
+        
+        if (isRamp && t.active && t.target && !t.target.dead) {
+            // Karena Tower class belum punya rampStage di data.js lama, 
+            // kita bisa pakai attackTimer terbalik atau tambahkan property baru.
+            // Untuk sekarang, kita visualkan saja.
+            
+            ctx.save(); 
+            ctx.strokeStyle = "red"; 
+            ctx.lineWidth = 4;
+            ctx.beginPath(); 
+            ctx.moveTo(t.x, t.y - 20); 
+            ctx.lineTo(t.target.x, t.target.y); 
+            ctx.stroke(); 
+            ctx.restore();
         }
         const isEnemy = t.team === 1; const barY = isEnemy ? t.y + 45 : t.y - 65; this.drawHpBarOnly(ctx, t, barY); ctx.restore();
     }
@@ -437,16 +487,19 @@ class Renderer {
         if (visuals && visuals.body) {
             const scale = visuals.scale || 1.0;
             const r = 20 * scale; // Radius building
-            
+            let bodyType = visuals.body;
+            if (b.isHidden && bodyType === 'tower_tesla') {
+                bodyType = 'tower_tesla_closed';
+            }
             // Render Modular Body (seperti unit)
-            this.drawModularBody(ctx, visuals.body, r, visuals.skin || color, visuals);
+            this.drawModularBody(ctx, bodyType, r, visuals.skin || color, visuals);
             
             // Render Head (jika ada)
             if (visuals.head && visuals.head !== 'none') {
+                ctx.rotate(b.angle + Math.PI/2);
                 this.drawModularHead(ctx, visuals.head, r, teamColor, visuals);
             }
         } 
-        // --- VISUAL KOTAK DEFAULT (Legacy) ---
         else {
             if (b.isHidden && !isGhost) { 
                 ctx.fillStyle = '#5d4037'; ctx.fillRect(-18, -18, 36, 36); 
@@ -470,12 +523,24 @@ class Renderer {
             this.drawStatusOutline(ctx, b, 25);
             
             // Visual Inferno Laser
-            if (b.key === 'inferno_tower' && b.target && !b.target.dead && b.rampStage > 0) {
-                 if (typeof Utils !== 'undefined' && Utils.getDist({x:0,y:0}, {x:b.target.x - b.x, y:b.target.y - b.y}) <= b.range + b.target.radius) {
+            // Generic Inferno Laser (Cek Tag)
+            if (b.tags.includes('ramp-damage') && b.target && !b.target.dead && b.rampStage > 0) {
+                 const dist = Utils.getDist(b, b.target);
+                 // Cek jarak visual toleransi
+                 if (dist <= b.range + b.target.radius + 20) {
                      ctx.save();
-                     ctx.strokeStyle = b.rampStage > 20 ? "red" : "orange";
-                     ctx.lineWidth = Math.min(8, 2 + b.rampStage * 0.2);
-                     ctx.beginPath(); ctx.moveTo(b.x, b.y - 30); ctx.lineTo(b.target.x, b.target.y); ctx.stroke();
+                     ctx.strokeStyle = b.rampStage > 30 ? "red" : "#ff9800"; // Warna berubah sesuai stage
+                     ctx.lineWidth = Math.min(8, 2 + b.rampStage * 0.1); // Makin tebal
+                     
+                     ctx.beginPath(); 
+                     ctx.moveTo(b.x, b.y - 30); // Titik tembak (adjust sesuai tinggi visual)
+                     ctx.lineTo(b.target.x, b.target.y); 
+                     ctx.stroke();
+                     
+                     // Efek pangkal dan ujung
+                     ctx.fillStyle = "yellow";
+                     ctx.beginPath(); ctx.arc(b.target.x, b.target.y, 5, 0, Math.PI*2); ctx.fill();
+                     
                      ctx.restore();
                  }
             }

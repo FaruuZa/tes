@@ -434,6 +434,20 @@ const CARDS = {
     visuals: { scale: 1.0, skin: "#e1f5fe", head: "hood_ice", body: "robe", weapon: "magic_ice", color: "#29b6f6" },
     desc: "Memperlambat musuh dengan es.",
   },
+  
+  holy_priest: {
+    name: "Holy Priest", cost: 4, icon: "🙏", type: "unit",
+    stats: { 
+      hp: 800, dmg: 40, hitSpeed: 0.2, speed: 1.0, range: 4.5,
+      // Target teman saja
+      targetType: 'allies-only', 
+      // Healing Beam continuous (dmg kecil tapi cepat = heal deras)
+      projectile: { type: 'instant', visual: 'beam' }
+    },
+    tags: ["ground", "single", "healer"],
+    visuals: { scale: 1.0, skin: "#fff9c4", head: "hood", body: "robe", weapon: "staff", color: "#fff" },
+    desc: "Menyalurkan sinar penyembuhan ke satu sekutu.",
+  },
 
   electro_wizard: {
     name: "Electro Wiz", cost: 4, icon: "⚡️", type: "unit",
@@ -586,31 +600,48 @@ const CARDS = {
   // =================================================================
   cannon: {
     name: "Cannon", cost: 3, icon: "🔫", type: "building",
-    stats: { hp: 742, dmg: 128, range: 5.0, hitSpeed: 0.9, lifetime: 30, radius: 20 },
-    tags: ["ground-only"], color: "#555"
+    stats: { 
+        hp: 742, dmg: 128, range: 5.0, hitSpeed: 0.9, lifetime: 30, radius: 20,
+        projectile: { type: 'normal', speed: 10 } 
+    },
+    tags: ["ground-only"], color: "#555",
+    visuals: { scale: 1.0, body: "building_base_stone", head: "turret_cannon", color: "#555" }
   },
   tesla: {
     name: "Tesla", cost: 4, icon: "⚡", type: "building",
-    stats: { hp: 954, dmg: 190, range: 5.0, hitSpeed: 1.1, lifetime: 35, radius: 20 },
-    tags: ["air-target", "hide-when-idle"], color: "#0288d1",
-    projectile: { type: 'instant', visual: 'lightning' }
+    stats: { 
+        hp: 954, dmg: 190, range: 5.0, hitSpeed: 1.1, lifetime: 35, radius: 20,
+        // TYPE INSTANT: Serangan langsung tanpa peluru terbang
+        projectile: { type: 'instant', visual: 'lightning' } 
+    },
+    tags: ["air-target", "hide-when-idle", "stun-effect"], 
+    visuals: { scale: 1.0, body: "tower_tesla", head: "none", color: "#0288d1" } // Visual coil
   },
   inferno_tower: {
     name: "Inferno", cost: 5, icon: "🔥", type: "building",
-    stats: { hp: 1452, dmg: 35, range: 6.0, hitSpeed: 0.4, lifetime: 30, radius: 22 },
-    tags: ["air-target", "ramp-damage"], color: "#d32f2f"
+    stats: { 
+        hp: 1452, dmg: 35, range: 6.0, hitSpeed: 0.4, lifetime: 30, radius: 22,
+        // RAMP DAMAGE: Logic khusus beam
+        projectile: { type: 'instant', visual: 'beam' }
+    },
+    tags: ["air-target", "ramp-damage"], 
+    visuals: { scale: 1.0, body: "tower_inferno", head: "tower_inferno", color: "#d32f2f" }
   },
   xbow: {
     name: "X-Bow", cost: 6, icon: "🏹", type: "building",
-    stats: { hp: 1330, dmg: 26, range: 11.5, hitSpeed: 0.25, lifetime: 40, radius: 25, deployTime: 3.5 },
-    tags: ["ground-only", "siege"], color: "#8e24aa"
+    stats: { 
+        hp: 1330, dmg: 26, range: 11.5, hitSpeed: 0.25, lifetime: 40, radius: 25, deployTime: 3.5,
+        projectile: { type: 'normal', speed: 12 }
+    },
+    tags: ["ground-only", "siege"], 
+    visuals: { scale: 1.2, body: "building_base_wood", head: "turret_xbow", color: "#8e24aa" }
   },
   tombstone: {
     name: "Tombstone", cost: 3, icon: "🪦", type: "building",
     stats: { hp: 422, lifetime: 30, radius: 20 },
     tags: ["spawner"],
     effects: { spawner: { unit: 'skeleton', count: 1, interval: 3.1 }, onDeath: [{ type: 'spawn', unit: 'skeleton', count: 4 }] },
-    color: "#9e9e9e"
+    visuals: { scale: 1.0, body: "building_tombstone", head: "none", color: "#9e9e9e" }
   },
 
   // =================================================================
@@ -639,6 +670,7 @@ crystal_archer: {
   stats: { 
     hp: 550, dmg: 145, hitSpeed: 1.3, speed: 1.0, range: 7.0,
     targetType: 'ground-air',
+    multiTarget: 3,
     projectile: { type: 'normal', speed: 12 }
   },
   tags: ["ground", "single", "air-target"],
@@ -938,6 +970,49 @@ phoenix_egg: {
       aura:[{type:'rage', amount:0.2, target:'self'}, {type:'poison', amount:100, target:'self'}],
     },
     visuals: { scale: 1, skin: "#ff5722", head: "dragon", body: "dragon", weapon: "none", hasWings: true, color: "#ff6f00" }
+  },
+
+  // 1. HUNTER (Shotgun: 5 Peluru, Jarak Dekat Sakit)
+  hunter: {
+    name: "Hunter", cost: 4, icon: "🤠", type: "unit",
+    stats: { 
+      hp: 800, dmg: 70, hitSpeed: 2.0, speed: 1.1, range: 4.5,
+      targetType: 'ground-air',
+      // COUNT: 5 peluru sekaligus!
+      // SPREAD: 1.5 (lebar sebaran)
+      projectile: { type: 'normal', speed: 11, count: 5, spread: 1.5 } 
+    },
+    tags: ["ground", "single", "air-target"],
+    visuals: { scale: 1.1, skin: "#5d4037", head: "hood", body: "fur_white", weapon: "musket", color: "#795548" },
+    desc: "Menembakkan 5 peluru sekaligus. Sangat mematikan di jarak dekat.",
+  },
+
+  // 2. TWIN GUNNER (Dual Wield: 2 Peluru Kiri-Kanan)
+  twin_gunner: {
+    name: "Twin Gunner", cost: 4, icon: "🔫", type: "unit",
+    stats: { 
+      hp: 600, dmg: 90, hitSpeed: 1.2, speed: 1.3, range: 5.5,
+      targetType: 'ground-air',
+      // COUNT: 2 peluru (Kiri & Kanan)
+      projectile: { type: 'normal', speed: 10, count: 2, spread: 1.2 } 
+    },
+    tags: ["ground", "single", "air-target"],
+    visuals: { scale: 0.9, skin: "#ffcc80", head: "hair_spiky", body: "cloth_tight", weapon: "dual_dagger", color: "#673ab7" },
+    desc: "Menembak dua kali lebih banyak, dua kali lebih asik.",
+  },
+  
+  // 3. BURST MAGE (3 Bola Api)
+  burst_mage: {
+    name: "Burst Mage", cost: 5, icon: "🔥", type: "unit",
+    stats: { 
+      hp: 650, dmg: 120, hitSpeed: 1.8, speed: 1.0, range: 5.5,
+      targetType: 'ground-air', splashRadius: 1.2,
+      // 3 Bola Api
+      projectile: { type: 'magic_fire', speed: 9, count: 3, spread: 0.8 } 
+    },
+    tags: ["ground", "area", "air-target"],
+    visuals: { scale: 1.0, skin: "#f0ceab", head: "hood", body: "robe", weapon: "magic_fire", color: "#d84315" },
+    desc: "Mengeluarkan 3 bola api sekaligus.",
   },
 
 };
