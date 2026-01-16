@@ -261,41 +261,41 @@ class Renderer {
 
     // --- MODULAR HELPERS ---
     drawModularBody(ctx, type, r, color, visuals) {
-        // --- ANIMASI SAYAP (WINGS) ---
-        if (visuals.hasWings) {
-            const time = Date.now() / 1000;
-            const flapSpeed = 15;
-            const flapAmp = 0.3;
-            const flap = Math.sin(time * flapSpeed) * flapAmp;
-            
+        // --- 1. DRAW ACCESSORY (LAYER BELAKANG) ---
+        // Digambar sebelum badan agar tertimpa (seperti sayap di punggung)
+        if (visuals.accessory && visuals.accessory !== 'none') {
             ctx.save();
-            ctx.fillStyle = "rgba(255,255,255,0.7)";
-            
-            // Sayap Kiri
-            ctx.save();
-            ctx.translate(-r * 0.8, 0);
-            ctx.rotate(-0.2 + flap); 
-            ctx.beginPath(); ctx.ellipse(-r*0.5, 0, r*0.6, r*0.8, 0, 0, Math.PI*2); ctx.fill();
-            ctx.restore();
-            
-            // Sayap Kanan
-            ctx.save();
-            ctx.translate(r * 0.8, 0);
-            ctx.rotate(0.2 - flap);
-            ctx.beginPath(); ctx.ellipse(r*0.5, 0, r*0.6, r*0.8, 0, 0, Math.PI*2); ctx.fill();
-            ctx.restore();
-            
+            // Cek apakah aksesoris ada di library VISUALS
+            if (VISUALS.accessories && VISUALS.accessories[visuals.accessory]) {
+                VISUALS.accessories[visuals.accessory](ctx, r, visuals.color || color);
+            }
             ctx.restore();
         }
 
-        // Render Body
+        // --- 2. ANIMASI SAYAP LAMA (LEGACY SUPPORT) ---
+        // Jika data masih pakai flag 'hasWings' tapi tidak punya accessory specific
+        if (visuals.hasWings && !visuals.accessory) {
+            const time = Date.now() / 1000;
+            const flap = Math.sin(time * 15) * 0.3;
+            ctx.save();
+            ctx.fillStyle = "rgba(255,255,255,0.7)";
+            // Sayap Kiri
+            ctx.save(); ctx.translate(-r * 0.8, 0); ctx.rotate(-0.2 + flap); 
+            ctx.beginPath(); ctx.ellipse(-r*0.5, 0, r*0.6, r*0.8, 0, 0, Math.PI*2); ctx.fill(); ctx.restore();
+            // Sayap Kanan
+            ctx.save(); ctx.translate(r * 0.8, 0); ctx.rotate(0.2 - flap);
+            ctx.beginPath(); ctx.ellipse(r*0.5, 0, r*0.6, r*0.8, 0, 0, Math.PI*2); ctx.fill(); ctx.restore();
+            ctx.restore();
+        }
+
+        // --- 3. RENDER BODY UTAMA ---
         if (VISUALS.bodies[type]) {
             VISUALS.bodies[type](ctx, r, visuals.skin || color);
         } else {
             VISUALS.bodies['default'](ctx, r, visuals.skin || color);
         }
         
-        // --- ANIMASI PROPELLER (BALING-BALING) ---
+        // --- 4. ANIMASI PROPELLER ---
         if (visuals.hasPropeller) {
             ctx.save();
             ctx.rotate(Date.now() / 100); 
@@ -417,59 +417,132 @@ class Renderer {
         }
     }
 
+    // DALAM RENDERER.JS
+
     drawTower(ctx, t) {
         ctx.save();
-        const stoneColor = t.team === 0 ? "#90a4ae" : "#5d4037";
+        ctx.translate(t.x, t.y);
+
+        // 1. TENTUKAN VISUAL & WARNA
+        // Ambil config dari TOWER_DATA (jika ada)
+        const data = (typeof TOWER_DATA !== 'undefined' && TOWER_DATA[t.type]) ? TOWER_DATA[t.type] : {};
+        
+        // Warna Tim (Biru/Merah)
         const teamColor = t.team === 0 ? "#42a5f5" : "#ef5350";
-        const darkerColor = t.team === 0 ? "#1565c0" : "#c62828";
-        ctx.save(); ctx.strokeStyle = "rgba(255, 255, 255, 0.3)"; ctx.lineWidth = 2; ctx.setLineDash([5, 5]); ctx.beginPath(); ctx.arc(t.x, t.y, t.range, 0, Math.PI * 2); ctx.stroke(); ctx.restore();
-        ctx.fillStyle = "rgba(0,0,0,0.3)"; ctx.beginPath(); ctx.ellipse(t.x, t.y+5, 30, 20, 0, 0, Math.PI*2); ctx.fill();
-        if(t.type==='king') {
-            const size = 50; const half = size / 2;
-            ctx.fillStyle = stoneColor; ctx.fillRect(t.x - half, t.y - half, size, size);
-            ctx.fillStyle = '#222'; ctx.fillRect(t.x - 10, t.y + 10, 20, 15); 
-        } else {
-            ctx.fillStyle = stoneColor; ctx.beginPath(); ctx.arc(t.x, t.y, 22, 0, Math.PI*2); ctx.fill();
+        // Warna Skin Tower (Bisa custom dari data, atau default tim)
+        const skinColor = data.color || teamColor;
+
+        // Tentukan Body & Head berdasarkan tipe
+        let bodyType = 'tower_princess';
+        let headType = 'turret_princess';
+
+        if (t.type === 'king') {
+            bodyType = 'tower_king';
+            headType = 'king_crown';
+        } else if (t.type === 'princess') {
+            bodyType = 'tower_princess';
+            headType = 'turret_princess';
+        } else if (t.type === 'tesla_tower') {
+            bodyType = 'tower_tesla';
+            headType = 'none'; // Tesla head menyatu dengan body animasi
+        } else if (t.type === 'inferno_tower') {
+            bodyType = 'tower_inferno';
+            headType = 'tower_inferno';
         }
-        ctx.save(); 
-        const turretOffset = t.type === 'king' ? 5 : 5; 
-        ctx.translate(t.x, t.y - turretOffset);
-        ctx.rotate(t.angle);
-        if(t.type==='king') {
-            if (t.active) {
-                ctx.fillStyle = "#ffd54f"; ctx.fillRect(0, -14, 32, 28); 
-                ctx.fillStyle = darkerColor; ctx.beginPath(); ctx.arc(0,0, 18, 0, Math.PI*2); ctx.fill();
-            } else {
-                ctx.fillStyle = darkerColor; ctx.beginPath(); ctx.arc(0,0, 16, 0, Math.PI*2); ctx.fill();
-                ctx.fillStyle = teamColor; ctx.beginPath(); ctx.arc(0,0, 10, 0, Math.PI*2); ctx.fill();
-            }
+
+        // Override jika ada definisi visuals custom di data.js
+        if (data.visuals) {
+            if (data.visuals.body) bodyType = data.visuals.body;
+            if (data.visuals.head) headType = data.visuals.head;
+        }
+
+        const r = t.radius; 
+
+        // 2. RENDER SHADOW (Bayangan)
+        ctx.fillStyle = "rgba(0,0,0,0.2)"; 
+        ctx.beginPath(); ctx.ellipse(0, r*0.2, r*1.2, r*0.8, 0, 0, Math.PI*2); ctx.fill();
+
+        // 3. RENDER MODULAR BODY
+        // Menggunakan library visual.js
+        this.drawModularBody(ctx, bodyType, r, skinColor, { skin: skinColor });
+
+        // 4. RENDER MODULAR HEAD (TURRET)
+        ctx.save();
+        
+        // Logika Khusus King Tower (Tidur jika tidak aktif)
+        if (t.type === 'king' && !t.active) {
+            // Jika tidur, jangan gambar meriam/kepala yang siaga
+            // Atau gambar kepala statis menghadap depan
+            // (Opsional: Bisa buat head 'king_sleep')
+            this.drawModularHead(ctx, headType, r, teamColor, {});
+            
+            // Efek "Zzz"
+            ctx.fillStyle = '#fff'; 
+            ctx.font = "bold 20px Arial"; 
+            ctx.textAlign = "center"; 
+            
+            const time = Date.now() / 500;
+            const floatY = Math.sin(time) * 5;
+            ctx.fillText("Zzz", 15, -35 + floatY);
         } else {
-            ctx.fillStyle = darkerColor; ctx.fillRect(0, -8, 25, 16); 
-            ctx.fillStyle = teamColor; ctx.beginPath(); ctx.arc(0,0, 12, 0, Math.PI*2); ctx.fill(); 
+            // Jika aktif, putar kepala menghadap target
+            ctx.rotate(t.angle); // angle tower sudah dihitung di update()
+            this.drawModularHead(ctx, headType, r, teamColor, {});
         }
         ctx.restore();
-        if(t.type==='king' && !t.active) { ctx.fillStyle = '#fff'; ctx.font = "bold 20px Arial"; ctx.textAlign="center"; ctx.fillText("Zzz", t.x, t.y-35); }
-        this.drawStatusOutline(ctx, t, t.radius + 5);
-        const isRamp = (t.tags && t.tags.includes('ramp-damage')) || t.type === 'inferno_tower';
+
+        // 5. VISUAL EFEK KHUSUS (INFERNO BEAM)
+        // Digambar manual karena beam bukan bagian dari body/head
+        const isRamp = (t.tags && t.tags.includes('ramp-damage')) || t.type === 'inferno_tower' || t.type === 'inferno_dragon'; // Cek type jaga-jaga
         
         if (isRamp && t.active && t.target && !t.target.dead) {
-            // Karena Tower class belum punya rampStage di data.js lama, 
-            // kita bisa pakai attackTimer terbalik atau tambahkan property baru.
-            // Untuk sekarang, kita visualkan saja.
-            
-            ctx.save(); 
-            ctx.strokeStyle = "red"; 
-            ctx.lineWidth = 4;
-            ctx.beginPath(); 
-            ctx.moveTo(t.x, t.y - 20); 
-            ctx.lineTo(t.target.x, t.target.y); 
-            ctx.stroke(); 
-            ctx.restore();
+            // Perlu akses Utils untuk hitung jarak visual
+            const dist = Math.hypot(t.target.x - t.x, t.target.y - t.y);
+            if (dist <= t.range + t.target.radius + 20) {
+                ctx.save(); 
+                
+                // Warna Beam (Makin lama makin merah/tebal)
+                // Kita pakai attackTimer terbalik atau rampStage logic (jika tower punya rampStage)
+                // Asumsi tower standar belum punya rampStage, kita pakai visual statis merah dulu
+                ctx.strokeStyle = "red"; 
+                ctx.lineWidth = 4;
+                
+                // Efek Jitter
+                const jitter = (Math.random() - 0.5) * 4;
+
+                ctx.beginPath(); 
+                ctx.moveTo(0, -20); // Dari puncak tower
+                // Target relatif terhadap posisi tower (karena ada ctx.translate di awal)
+                ctx.lineTo(t.target.x - t.x + jitter, t.target.y - t.y + jitter); 
+                ctx.stroke(); 
+                
+                // Kilatan di target
+                ctx.fillStyle = "yellow";
+                ctx.beginPath(); 
+                ctx.arc(t.target.x - t.x, t.target.y - t.y, 6, 0, Math.PI*2); 
+                ctx.fill();
+
+                ctx.restore();
+            }
         }
-        const isEnemy = t.team === 1; const barY = isEnemy ? t.y + 45 : t.y - 65; this.drawHpBarOnly(ctx, t, barY); ctx.restore();
+
+        // 6. STATUS OUTLINE (Stun/Freeze/Slow)
+        this.drawStatusOutline(ctx, t, r + 5);
+
+        // 7. HP BAR
+        ctx.restore(); // Restore context sebelum gambar HP bar (agar tidak ikut rotate/translate tower)
+        
+        // HP Bar Posisi
+        // Musuh (Team 1) bar di atas, Kita (Team 0) bar di bawah tower -- atau standar game di atas semua?
+        // Clash Royale: Bar selalu di atas unit/tower.
+        const barY = t.y - r - 25; 
+        
+        // Tampilkan HP Bar hanya jika HP berkurang
+        if (t.hp < t.maxHp) {
+            this.drawHpBarOnly(ctx, t, barY);
+        }
     }
 
-    // DALAM FILE RENDERER.JS
 
     drawBuilding(ctx, b, isGhost) {
         ctx.save();

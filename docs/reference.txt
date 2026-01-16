@@ -1,29 +1,39 @@
-=== TRAITS & TAGS REFERENCE ===
+=== TRAITS & TAGS REFERENCE (UPDATED) ===
 
 [ LOGIC TAGS ]
 Digunakan dalam array `tags: [...]` di data.js.
 
---- Tipe Unit & Fisik ---
+--- Role & Behavior ---
+win_condition   : Unit yang fokus menghancurkan tower (Hog, Giant, Balloon).
+tank            : HP tinggi, pelindung pasukan di belakang (Golem, PEKKA).
+mini_tank       : HP menengah, semi-tank (Valkyrie, Knight).
+dps             : Damage per second tinggi (Musketeer, Hunter).
+glass_cannon    : Damage besar tapi HP sangat tipis (Princess).
+swarm           : Unit bergerombol banyak (Skeleton Army, Minion Horde).
+aoe             : Area of Effect, menyerang banyak musuh (Wizard, Valkyrie).
+support         : Memberikan buff/heal atau serangan jarak jauh (Healer).
+control         : Mengganggu gerakan musuh (Ice Wiz, E-Wiz, Tornado).
+cycle           : Biaya elixir rendah untuk memutar deck (Ice Spirit, Skeletons).
+spawner         : Memunculkan unit lain secara berkala (Witch, Tombstone).
+defense         : Bangunan pertahanan (Cannon, Tesla).
+siege           : Bangunan yang bisa menyerang tower dari wilayah sendiri (X-Bow).
+
+--- Fisik & Gerakan ---
 ground          : Unit berjalan di darat.
 air             : Unit terbang (melewati sungai & bangunan).
-heavy           : Unit berat, tidak mudah didorong (PEKKA, Golem).
-fast            : Unit cepat (Hog, Bandit, Lumberjack).
-building-hunter : Prioritas menyerang bangunan (Giant, Hog).
+heavy           : Unit berat, tidak mudah didorong (PEKKA, Golem, Giant).
+fast            : Unit bergerak sangat cepat (Hog, Lumberjack).
 river-jumper    : Unit darat yang bisa melompati sungai (Hog, Prince).
+building-hunter : Prioritas menyerang bangunan saja.
 kamikaze        : Mati saat menyerang (Spirits, Wall Breakers).
-shielded        : Memiliki shield (Dark Prince, Guards).
-swarm           : Unit bergerombol (Skeleton Army, Minion Horde).
+shielded        : Memiliki shield/nyawa cadangan (Dark Prince, Guards).
 
---- Tipe Bangunan ---
-spawner         : Bangunan yang memunculkan unit (Tombstone, Witch).
-siege           : Bangunan jarak jauh (X-Bow, Mortar).
-hide-when-idle  : Masuk ke tanah saat tidak menyerang (Tesla).
-ramp-damage     : Damage meningkat seiring waktu (Inferno Tower/Dragon).
-
---- Legacy Effect Tags (Opsional / Support) ---
+--- Special Effects ---
+healer          : Unit yang bisa menyembuhkan (Battle Healer).
 stun-effect     : Serangan memberikan efek Stun (E-Wiz).
-slow-effect     : Serangan memberikan efek Slow (Ice Wiz).
-push-effect     : Serangan mendorong musuh (Bowler/Log).
+slow-effect     : Serangan memberikan efek Slow (Ice Wiz, Ice Golem).
+ramp-damage     : Damage meningkat seiring waktu (Inferno Tower/Dragon).
+hide-when-idle  : Masuk ke tanah saat tidak ada musuh (Tesla).
 
 
 [ STATS PROPERTIES ]
@@ -39,24 +49,34 @@ sightRange      : Jarak pandang untuk mengejar musuh.
 deployTime      : Waktu tunggu saat unit diletakkan (detik).
 splashRadius    : Radius area damage (grid).
 multiTarget     : Jumlah target yang diserang sekaligus (E-Wiz = 2).
+count           : Jumlah unit yang di-spawn (Skeleton x3).
 
---- Targeting System ---
+--- Advanced Targeting ---
 targetType      : 
     'ground-only' : Hanya serang darat (Knight, Bomber).
-    'air-only'    : Hanya serang udara (Jarang).
     'ground-air'  : Serang darat & udara (Archer, Wizard).
-    'allies-only' : Hanya target teman (Battle Healer).
+    'air-only'    : Hanya serang udara (Jarang).
+    'allies-only' : Hanya target teman (Healer, Drummer).
+
+targetPreferences : Array tag prioritas. (Contoh: ['tank', 'win_condition'])
+                    Unit support akan memilih target dengan tag ini meski jauh.
+
+--- Melee System ---
+meleeType       :
+    'single'      : Serangan ke 1 target (PEKKA).
+    'circular'    : Serangan area 360 derajat (Valkyrie).
+    'cleave'      : Serangan area kerucut di DEPAN unit (Dark Prince, MK).
 
 --- Projectile System ---
 projectile      : Objek konfigurasi `{ type: '...', speed: ..., visual: ... }`
-    type        : 'normal', 'boomerang', 'rolling', 'rolling_log', 'spear', 'instant' (Petir/Laser).
-    speed       : Kecepatan peluru.
-    visual      : 'lightning' (untuk type instant).
+    type        : 'normal', 'boomerang', 'rolling', 'rolling_log', 'spear'.
+    visual      : 'beam' (Laser), 'lightning' (Petir Instan).
+    count       : Jumlah proyektil per tembakan (Hunter x5).
+    spread      : Sebaran proyektil (Hunter spread 1.5).
 
 
 [ MODULAR EFFECTS SYSTEM ]
 Digunakan dalam objek `effects: { ... }` di data.js.
-Menggantikan properti lama spawnEffect/deathEffect.
 
 Trigger Keys:
   onHit         : Efek saat serangan mengenai target.
@@ -70,14 +90,15 @@ Properties per Effect:
   duration      : Durasi efek (detik).
   radius        : Radius area efek (grid).
   target        : 'enemy' (default), 'ally', 'self'.
-  
+  visual        : Override visual (misal: 'poison', 'zap').
+
   -- Khusus type: 'spawn' --
-  unit          : Key unit yang dimunculkan (misal: 'skeleton').
+  unit          : Key unit yang dimunculkan.
   count         : Jumlah unit.
-  
+
   -- Khusus type: 'spell' --
-  spell         : Key spell yang dipicu (misal: 'rage', 'void').
-  delay         : Waktu tunggu sebelum spell aktif (detik).
+  spell         : Key spell yang dipicu (misal: 'fireball').
+  delay         : Waktu tunggu (detik).
 
 
 [ ABILITIES ]
@@ -86,7 +107,7 @@ Digunakan dalam objek `abilities: { ... }`
 charge: {       (Prince, Dark Prince)
     speedMult: 2.0,  // Pengali kecepatan
     dmg: 600,        // Damage saat tabrak
-    windup: 90       // Frame yang dibutuhkan untuk mulai lari
+    windup: 90       // Frame persiapan
 }
 
 jumpAttack: {   (Mega Knight)
@@ -98,21 +119,112 @@ jumpAttack: {   (Mega Knight)
 }
 
 
-[ VISUAL TRAITS ]
+[ VISUAL TRAITS LIBRARY ]
 Digunakan dalam objek `visuals: { ... }` untuk renderer.js & visual.js.
 
---- Props Tambahan ---
-hasWings        : Punya animasi sayap mengepak (Minion, Dragon).
-hasPropeller    : Punya baling-baling berputar (Flying Machine).
-scale           : Ukuran visual unit (1.0 default).
-skin            : Warna kulit override.
+--- Accessories (Aksesoris Belakang) ---
+wings_angel     : Sayap malaikat berbulu (Healer).
+wings_demon     : Sayap kelelawar (Minion).
+wings_dragon    : Sayap naga bersisik (Baby Dragon).
+wings_mech      : Sayap robotik (Flying Machine/Custom).
+wings_fairy     : Sayap transparan serangga.
+cape_royal      : Jubah panjang kerajaan (Knight).
+cape_tattered   : Jubah robek (Valkyrie/MK).
+jetpack         : Tas roket sci-fi.
+backpack_survival: Tas petualang (Wall Breakers).
+
+--- Head (Kepala/Topi) ---
+default         : Bulat polos.
+helmet          : Helm prajurit standar.
+helmet_open     : Helm terbuka (Royal Giant).
+helmet_full     : Helm tertutup penuh (Mega Knight).
+helmet_bucket   : Helm ember (Dark Prince).
+helmet_viking   : Helm bertanduk (Valkyrie/Elite Barb).
+helmet_miner    : Helm dengan lampu.
+helmet_tech     : Helm sci-fi (Inferno Dragon).
+helmet_laser    : Helm cyberpunk visor (Laser Master).
+hood            : Tudung kain (Archer, Wizard).
+hood_ice        : Tudung es (Ice Wiz).
+hood_dark       : Tudung gelap (Necromancer).
+hood_ninja      : Tudung ninja (Assassin).
+hat_wizard      : Topi kerucut penyihir.
+hat_winter      : Topi musim dingin (Lumberjack).
+crown_king      : Mahkota raja.
+tiara           : Mahkota putri (Princess).
+mask            : Topeng polos.
+mask_hood       : Topeng eksekutor.
+skull           : Tengkorak kecil.
+skull_giant     : Tengkorak besar.
+skull_helm      : Tengkorak berhelm (Guards).
+mohawk          : Rambut mohawk (Hog Rider).
+hair_spiky      : Rambut tajam (E-Wiz).
+hair_orange     : Rambut oranye (Valkyrie).
+hair_long       : Rambut panjang (Healer).
+dragon          : Kepala naga.
+demon           : Kepala minion.
+bat             : Kepala kelelawar.
+goggles         : Kacamata (Bomber).
+bandana         : Ikat kepala (Goblins).
+head_pumpkin    : Kepala labu.
+head_cyclops    : Mata satu.
+turret_cannon   : Meriam bangunan.
+turret_xbow     : Crossbow bangunan.
+turret_princess : Putri di atas tower.
+king_crown      : Raja di atas tower.
+
+--- Body (Badan/Armor) ---
+default         : Standar.
+cloth           : Baju kain biasa.
+cloth_tight     : Baju ketat.
+cloth_heavy     : Baju tebal berotot.
+robe            : Jubah penyihir.
+robe_dark       : Jubah gelap.
+robe_green      : Jubah hijau.
+armor_plate     : Armor plat besi (Mini PEKKA).
+armor_heavy     : Armor berat V-shape (PEKKA/MK).
+armor_samurai   : Armor berlapis (Samurai).
+ancient_armor   : Armor batu kuno (Titan).
+shirt_plaid     : Kemeja kotak-kotak (Lumberjack).
+ribs            : Tulang rusuk (Skeleton).
+ribs_armor      : Tulang berarmor (Guards).
+rock            : Badan batu (Golem).
+rock_body       : Badan lava (Hound).
+dragon          : Badan naga.
+demon           : Badan minion.
+bat             : Badan kelelawar.
+pig             : Badan babi (Hog Rider).
+machine_tank    : Tanki mesin (Sparky).
+wood_mech       : Mesin kayu (Flying Machine).
+wood_box        : Kotak kayu.
+basket          : Keranjang balon.
+spirit          : Badan roh (Ice Spirit).
+body_spider     : Badan laba-laba.
+body_snake      : Badan ular/naga panjang.
+body_centaur    : Badan kuda.
+body_ice_golem  : Badan kristal es.
+body_fire_elemental : Badan api.
+tower_king      : Benteng batu (King Tower).
+tower_princess  : Menara bulat (Princess Tower).
+tower_tesla     : Menara listrik (Tesla).
+tower_inferno   : Menara lava (Inferno).
+building_base_stone : Alas batu bulat (Cannon).
+building_base_wood  : Alas kayu kotak (X-Bow).
+building_furnace    : Tungku api.
+building_hut        : Pondok kayu.
+building_tombstone  : Batu nisan.
 
 --- Weapon (Senjata) ---
-none            : Tidak ada visual senjata.
+none            : Kosong.
+fist            : Tangan kosong.
+fist_rock       : Tangan batu (Golem).
+fist_ice        : Tangan es.
+fist_giant      : Tangan raksasa.
 sword           : Pedang standar.
 sword_giant     : Pedang besar (PEKKA).
 sword_light     : Pedang cahaya (Healer).
 dual_swords     : Dua pedang.
+dual_dagger     : Dua pisau.
+dagger          : Pisau kecil.
 axe             : Kapak.
 axe_double      : Kapak ganda (Valkyrie).
 axe_throw       : Kapak lempar (Executioner).
@@ -121,53 +233,27 @@ hammer          : Palu (Hog).
 mace            : Gada berduri (Dark Prince).
 mace_hands      : Tangan gada (Mega Knight).
 bow             : Busur.
-bow_fire        : Busur api (Princess).
-spear           : Tombak (Goblins).
-lance           : Tombak berkuda (Prince).
-musket          : Senapan (Musketeer).
-cannon_hand     : Meriam tangan (Royal Giant).
-cannon          : Meriam kendaraan (Flying Machine).
-staff           : Tongkat sihir (Witch).
+bow_fire        : Busur api.
+spear           : Tombak.
+lance           : Tombak berkuda.
+musket          : Senapan.
+cannon_hand     : Meriam tangan.
+cannon          : Meriam kendaraan.
+coil_gun        : Senjata listrik (Sparky).
+staff           : Tongkat sihir.
+staff_wood      : Tongkat kayu.
 staff_axe       : Tongkat kapak.
-magic_fire      : Orb api (Wizard).
-magic_ice       : Orb es (Ice Wiz).
-magic_zap       : Orb listrik (E-Wiz).
-bomb_carry      : Bom besar (Giant Skeleton).
+magic_fire      : Orb api.
+magic_ice       : Orb es.
+magic_zap       : Orb listrik.
+bomb_carry      : Bom besar.
 bomb_drop       : Bom balon.
-bomb_hug        : Bom peluk (Wall Breakers).
-coil_gun        : Kumparan listrik (Sparky).
-beam_emitter    : Pemancar laser (Inferno).
-
---- Head (Kepala) ---
-default         : Bulat.
-helmet          : Helm standar.
-helmet_open     : Helm terbuka.
-helmet_full     : Helm tertutup (MK).
-helmet_bucket   : Helm ember (Dark Prince).
-helmet_tech     : Helm scifi (Inferno Dragon).
-hood            : Tudung (Archer).
-hood_ice        : Tudung es.
-hood_dark       : Tudung gelap.
-skull           : Tengkorak.
-skull_giant     : Tengkorak besar.
-mohawk          : Rambut mohawk (Hog).
-tiara           : Mahkota putri.
-mask_hood       : Topeng eksekutor.
-dragon          : Kepala naga.
-machine         : Kepala mesin.
-balloon         : Balon udara.
-coil            : Kumparan tesla.
-
---- Body (Badan) ---
-default         : Standar.
-armor_heavy     : Armor berat (PEKKA, MK).
-armor_plate     : Plat besi (Mini PEKKA).
-robe            : Jubah.
-robe_dark       : Jubah gelap.
-ribs            : Tulang rusuk.
-dragon          : Badan naga.
-wood_mech       : Mekanik kayu (Flying Machine).
-basket          : Keranjang balon.
-machine_tank    : Tanki mesin (Sparky).
-demon           : Badan minion.
-bat             : Badan kelelawar.
+bomb_hug        : Bom peluk.
+beam_emitter    : Pemancar laser.
+laser_beam      : Senjata laser bahu.
+scythe_reaper   : Sabit besar.
+trident_sea     : Trisula.
+shield_tower    : Perisai besar.
+shield_round_viking : Perisai bulat.
+crossbow_hand   : Crossbow tangan.
+book_spell      : Buku sihir melayang.

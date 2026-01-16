@@ -29,25 +29,50 @@ class Entity {
     this.poisoned = 0;
     this.poisonDmg = 0;
     this.maxPoison = 0;
+
+    // --- MODULAR EFFECTS SYSTEM (Moved to Parent) ---
+    this.effects = {}; // Akan diisi oleh child class (Unit/Building)
+    this.spawnEffectTriggered = false;
+    this.deathEffectTriggered = false;
+    this.spawnTimer = 0; // Untuk effect spawner
   }
+
+  // =================================================================
+  // CORE MECHANICS (Damage, Heal, Status)
+  // =================================================================
 
   takeDamage(amount) {
     if (this.isHidden) return;
+
+    // Shield Logic
     if (this.shield > 0) {
       this.shield -= amount;
       if (this.shield < 0) this.shield = 0;
-      return;
+      return; // Shield menyerap damage sepenuhnya (mekanik Clash Royale)
     }
+
     this.hp -= amount;
-    if (this.hp <= 0) this.dead = true;
+    if (this.hp <= 0) {
+      this.dead = true;
+      this.hp = 0;
+
+      // Trigger Death Effect otomatis
+      if (!this.deathEffectTriggered) {
+        this.handleDeathEffect();
+        this.deathEffectTriggered = true;
+      }
+    }
+  }
+
+  heal(amount) {
+    if (this.dead || this.hp >= this.maxHp) return;
+    this.hp = Math.min(this.hp + amount, this.maxHp);
   }
 
   applyStun(duration, type) {
     if (this.isHidden) return;
     const durFrames = duration * 60;
 
-    // Set max hanya jika durasi baru lebih besar dari sisa durasi sekarang
-    // Ini agar progress bar "refill" penuh lagi
     if (durFrames > this.stunned) {
       this.maxStunned = durFrames;
     }
@@ -56,10 +81,11 @@ class Entity {
     if (type === "freeze") this.freezeActive = true;
     else if (type === "zap") this.zapActive = true;
 
+    // Reset status serangan jika terkena stun
     this.rampStage = 0;
     this.target = null;
     this.isAttacking = false;
-    this.attackTimer = 60;
+    this.attackTimer = 60; // Delay setelah stun
 
     if (this.isCharging !== undefined) {
       this.isCharging = false;
@@ -68,8 +94,7 @@ class Entity {
   }
 
   applyRage(boost) {
-    // Rage di-refresh terus, jadi visualnya akan selalu penuh
-    this.rageBoosted = 10;
+    this.rageBoosted = 10; // Refresh terus
     this.maxRage = 10;
     this.rageAmount = boost;
   }
@@ -90,14 +115,10 @@ class Entity {
     const durFrames = duration * 60;
     if (durFrames > this.poisoned) this.maxPoison = durFrames;
     this.poisoned = Math.max(this.poisoned, durFrames);
-    this.poisonDmg = dps; // Damage per detik
+    this.poisonDmg = dps;
   }
 
-  heal(amount) {
-    if (this.dead || this.hp >= this.maxHp) return;
-    this.hp = Math.min(this.hp + amount, this.maxHp);
-  }
-
+  // Dipanggil setiap frame oleh Update
   updateStatus() {
     if (this.stunned > 0) {
       this.stunned--;
@@ -108,12 +129,268 @@ class Entity {
     }
     if (this.poisoned > 0) {
       this.poisoned--;
+      // Damage per frame untuk Poison
       this.takeDamage(this.poisonDmg / 60);
     }
     if (this.rageBoosted > 0) this.rageBoosted--;
     if (this.slowed > 0) this.slowed--;
+
     this.animFrame++;
     this.pushFactor = 1.0;
+  }
+
+  // =================================================================
+  // MODULAR EFFECTS PROCESSING (The "Brain")
+  // =================================================================
+
+  /**
+   * Menangani efek Pasif seperti Aura dan Spawner
+   * Dipanggil di dalam update() anak
+   */
+  processActiveEffects(game) {
+    if (this.effects.aura) this.processAura(game);
+    if (this.effects.spawner) this.processSpawner(game);
+  }
+
+  /**
+   * Menangani Efek Kematian
+   * Menggunakan variabel global GAME sebagai fallback jika parameter game tidak ada
+   */
+  handleDeathEffect() {
+    // Priority 1: Modular Effects (New System)
+    if (this.effects && this.effects.onDeath) {
+      // Kita gunakan global GAME karena takeDamage sering dipanggil tanpa passing context game
+      if (typeof GAME !== "undefined") {
+        this.triggerEffectsArea(GAME, "onDeath", this.x, this.y);
+      }
+    }
+    // Priority 2: Legacy (Old System Backup)
+    else if (this.deathEffect && typeof GAME !== "undefined") {
+      this.doLegacyDeathEffect(GAME);
+    }
+  }
+
+  /**
+   * Trigger efek target tunggal (biasanya dari serangan/projectile)
+   * Contoh: Ice Wizard hit (Slow), Poison hit (Damage over time)
+   */
+  triggerEffects(game, triggerName, targetEntity) {
+    if (!this.effects[triggerName]) return;
+
+    this.effects[triggerName].forEach((eff) => {
+      let finalTarget = targetEntity;
+      if (eff.target === "self") finalTarget = this;
+
+      if (!finalTarget) return;
+
+      if (eff.type === "damage") {
+        if (eff.duration > 0) {
+          finalTarget.applyPoison(eff.duration, eff.amount);
+        } else {
+          finalTarget.takeDamage(eff.amount);
+        }
+      }
+      if (eff.type === "heal") finalTarget.heal(eff.amount);
+      if (eff.type === "stun")
+        finalTarget.applyStun(eff.duration, eff.visual || "zap");
+      if (eff.type === "slow") finalTarget.applySlow(eff.duration, eff.amount);
+      if (eff.type === "rage") finalTarget.applyRage(eff.amount);
+    });
+  }
+
+  /**
+   * Trigger efek area (Spawn, Death, Area Damage)
+   */
+  triggerEffectsArea(game, triggerName, x, y, radiusOverride = null) {
+    if (!this.effects[triggerName]) return;
+
+    this.effects[triggerName].forEach((eff) => {
+      const r =
+        (eff.radius || 0) * CONFIG.gridSize ||
+        radiusOverride ||
+        this.splashRadius ||
+        0;
+
+      // 1. SPAWN UNIT (Golem, Witch, Tombstone)
+      if (eff.type === "spawn") {
+        for (let i = 0; i < eff.count; i++) {
+          const ox = (Math.random() - 0.5) * 20;
+          const oy = (Math.random() - 0.5) * 20;
+
+          // Cek tipe data kartu yang akan di-spawn
+          const spawnCardData = CARDS[eff.unit];
+          if (spawnCardData) {
+            if (spawnCardData.type === "building") {
+              const b = new Building(x + ox, y + oy, this.team, eff.unit);
+              game.buildings.push(b);
+            } else {
+              const u = new Unit(x + ox, y + oy, this.team, eff.unit);
+              u.deployTimer = 20; // Waktu spawn singkat
+              game.units.push(u);
+            }
+          }
+        }
+        return;
+      }
+
+      // 2. TRIGGER SPELL (Death Bomb, Rage, etc)
+      if (eff.type === "spell") {
+        const spellCard = CARDS[eff.spell];
+        if (spellCard) {
+          const delaySec =
+            eff.delay !== undefined
+              ? eff.delay
+              : spellCard.stats.spawnDelay || 1.0;
+          game.pendingSpells.push({
+            key: eff.spell,
+            x: x,
+            y: y,
+            team: this.team,
+            timer: delaySec * 60,
+            maxTimer: delaySec * 60,
+            radius:
+              r > 0 ? r : (spellCard.stats.radius || 2.5) * CONFIG.gridSize,
+            overrideDmg: eff.amount,
+            overrideDuration: eff.duration,
+          });
+        }
+        return;
+      }
+
+      // 3. DIRECT AREA EFFECT (Instant Damage/Heal/Stun/Slow)
+      // Cari target di sekitar
+      const targets = [...game.units, ...game.buildings, ...game.towers].filter(
+        (u) => !u.dead && Utils.getDist({ x, y }, u) <= r
+      );
+
+      targets.forEach((t) => {
+        if (eff.target === "self") return; // Skip self check logic for area usually
+        if (eff.type === "heal" && t.team !== this.team) return;
+        if (eff.type !== "heal" && t.team === this.team) return;
+
+        if (eff.type === "damage") {
+          if (eff.duration > 0) t.applyPoison(eff.duration, eff.amount);
+          else t.takeDamage(eff.amount);
+        }
+        if (eff.type === "heal") t.heal(eff.amount);
+        if (eff.type === "stun") t.applyStun(eff.duration, eff.visual || "zap");
+        if (eff.type === "slow") t.applySlow(eff.duration, eff.amount);
+      });
+
+      // Visual Effect Sederhana
+      if (eff.type === "damage" && !eff.duration) {
+        game.effects.push(new Effect(x, y, r, "orange"));
+      }
+    });
+  }
+
+  processAura(game) {
+    if (!this.effects.aura) return;
+
+    this.effects.aura.forEach((eff) => {
+      const radius = (eff.radius || 3) * CONFIG.gridSize;
+
+      // Aura ke Diri Sendiri (misal: Berserker Rage)
+      if (eff.target === "self") {
+        if (eff.type === "rage") this.applyRage(eff.amount);
+        if (eff.type === "heal") this.heal(eff.amount / 60);
+
+        // Visual Aura Self
+        if (game.frameCount % 30 === 0) {
+          game.effects.push(
+            new Effect(this.x, this.y, this.radius + 5, "rgba(255, 0, 0, 0.3)")
+          );
+        }
+        return;
+      }
+
+      // Aura Area (Healer, Flame Knight)
+      const targets = [...game.units, ...game.buildings].filter(
+        (u) => !u.dead && Utils.getDist(this, u) <= radius
+      );
+
+      targets.forEach((t) => {
+        if (eff.target === "enemy" && t.team === this.team) return;
+        if (eff.target === "ally" && t.team !== this.team) return;
+
+        if (eff.type === "damage") t.takeDamage(eff.amount / 60); // DPS
+        if (eff.type === "heal") t.heal(eff.amount / 60); // HPS
+        if (eff.type === "slow") t.applySlow(0.1, eff.amount); // Constant refresh
+        if (eff.type === "rage") t.applyRage(eff.amount); // Constant refresh
+      });
+
+      // Visual Aura Area
+      if (game.frameCount % 30 === 0) {
+        const color =
+          eff.type === "heal" ? "rgba(0,255,0,0.1)" : "rgba(255,255,255,0.1)";
+        game.effects.push(new Effect(this.x, this.y, radius, color));
+      }
+    });
+  }
+
+  processSpawner(game) {
+    const sp = this.effects.spawner;
+    if (!sp) return;
+
+    if (!this.spawnTimer) this.spawnTimer = 0;
+    this.spawnTimer++;
+
+    // Cek interval (detik * 60 fps)
+    if (this.spawnTimer >= sp.interval * 60) {
+      this.spawnTimer = 0;
+      for (let i = 0; i < sp.count; i++) {
+        // Spawn sedikit acak di sekitar
+        const ox = (Math.random() - 0.5) * 20;
+        const oy = (Math.random() - 0.5) * 20;
+
+        // Cek apakah spawn unit atau building (jarang building dispawn tapi support saja)
+        const spawnData = CARDS[sp.unit];
+        if (spawnData) {
+          const u = new Unit(this.x + ox, this.y + oy, this.team, sp.unit);
+          u.deployTimer = 20; // Waktu bangun sebentar
+          game.units.push(u);
+        }
+      }
+    }
+  }
+
+  // Legacy Death Effect (Untuk support data lama)
+  doLegacyDeathEffect(game) {
+    const de = this.deathEffect;
+    if (!de) return;
+
+    const radiusPx = (de.radius || 3) * CONFIG.gridSize;
+
+    if (de.type === "explode" || de.dmg) {
+      game.dealAreaDamage(
+        this.x,
+        this.y,
+        radiusPx,
+        de.dmg || 0,
+        this.team,
+        "damage"
+      );
+      game.effects.push(new Effect(this.x, this.y, radiusPx, "orange"));
+    }
+    if (de.type === "split") {
+      for (let i = 0; i < de.count; i++) {
+        const ox = (Math.random() - 0.5) * 20;
+        const u = new Unit(this.x + ox, this.y, this.team, de.unit);
+        u.deployTimer = 20;
+        game.units.push(u);
+      }
+    }
+    if (de.type === "spell" && de.spell) {
+      game.executeSpellEffect({
+        key: de.spell,
+        x: this.x,
+        y: this.y,
+        team: this.team,
+        radius: radiusPx,
+        overrideDmg: de.amount,
+        overrideDuration: de.duration,
+      });
+    }
   }
 
   // Helper Outline (Dipanggil Renderer)
@@ -151,6 +428,12 @@ class Unit extends Entity {
     const data = CARDS[key];
     this.key = key;
 
+    // --- PHYSICAL (DIPINDAHKAN KE ATAS) ---
+    this.tags = data.tags || [];
+    this.isAir = this.tags.includes("air");
+    this.radius = this.tags.includes("heavy") ? 16 : 9;
+    this.mass = this.tags.includes("heavy") ? 5.0 : 1.0;
+
     // --- CORE STATS ---
     this.maxHp = data.stats.hp || 100;
     this.hp = this.maxHp;
@@ -166,31 +449,34 @@ class Unit extends Entity {
     this.targetType = data.stats.targetType || "ground-air";
     this.buildingHunter = data.tags && data.tags.includes("building-hunter");
 
+    this.targetPreferences = data.stats.targetPreferences || [];
+
     // --- ATTACK CONFIG ---
     this.hitSpeed = (data.stats.hitSpeed || 1) * 60;
-    this.firstHitDelay = (data.stats.firstHitDelay || 0.5) * 60;
+
+    // [FIX] KAMIKAZE INSTANT ATTACK
+    if (this.tags.includes("kamikaze")) {
+      this.firstHitDelay = 5; // Hampir instan (5 frame)
+    } else {
+      this.firstHitDelay = (data.stats.firstHitDelay || 0.5) * 60;
+    }
+
     this.isMelee = this.range <= 20;
     this.projectileData = data.stats.projectile;
     this.splashRadius = (data.stats.splashRadius || 0) * CONFIG.gridSize;
     this.multiTarget = data.stats.multiTarget || 1;
 
-    // --- TIMERS (Untuk Visual Progress) ---
+    // --- TIMERS ---
     this.deployTimer = (data.stats.deployTime || 1) * 60;
-    this.maxDeployTimer = this.deployTimer; // PENTING: Untuk visual lingkaran putih
+    this.maxDeployTimer = this.deployTimer;
 
-    // --- PHYSICAL ---
-    this.tags = data.tags || [];
-    this.isAir = this.tags.includes("air");
-    this.radius = this.tags.includes("heavy") ? 16 : 9;
-    this.mass = this.tags.includes("heavy") ? 5.0 : 1.0;
-
-    // --- MODULAR EFFECTS & ABILITIES ---
+    // --- INHERITED EFFECTS ---
     this.effects = data.effects || {};
+    this.deathEffect = data.deathEffect || null;
+
+    // --- ABILITIES ---
     this.jumpConfig = data.abilities?.jumpAttack || null;
     this.chargeConfig = data.abilities?.charge || null;
-
-    // Legacy Support (Agar kode lama tidak error)
-    this.deathEffect = data.deathEffect || null;
 
     // --- STATES ---
     this.target = null;
@@ -200,7 +486,6 @@ class Unit extends Entity {
     this.stuckTimer = 0;
     this.isMoving = false;
     this.isAttacking = false;
-    this.isSleeping = false;
     this.angle = team === 0 ? -Math.PI / 2 : Math.PI / 2;
     this.canJumpRiver =
       data.canJumpRiver || this.tags.includes("river-jumper") || this.isAir;
@@ -210,344 +495,215 @@ class Unit extends Entity {
     this.jumpTimer = 0;
     this.isCharging = false;
     this.chargeTimer = 0;
-    this.spawnEffectTriggered = false;
-    this.deathEffectTriggered = false;
+    this.hasWeapon = true;
 
-    this.hasWeapon = true; // Default punya senjata
+    // [NEW] MELEE TYPE CONFIGURATION
+    // 'single'   : Target tunggal (Default jika splashRadius 0)
+    // 'circular' : Area 360 sekeliling badan (Valkyrie) - (Default jika splashRadius > 0)
+    // 'cleave'   : Area di depan muka unit (Mega Knight, Dark Prince)
+    this.meleeType =
+      data.stats.meleeType || (this.splashRadius > 0 ? "circular" : "single");
   }
+
   update(game) {
-    if (this.deployTimer > 0) { 
-        this.deployTimer--; 
-        if (this.deployTimer <= 0 && !this.spawnEffectTriggered) {
-            this.triggerEffectsArea(game, 'onSpawn', this.x, this.y);
-            this.spawnEffectTriggered = true;
-        }
-        return; 
+    if (this.deployTimer > 0) {
+      this.deployTimer--;
+      if (this.deployTimer <= 0 && !this.spawnEffectTriggered) {
+        this.triggerEffectsArea(game, "onSpawn", this.x, this.y);
+        this.spawnEffectTriggered = true;
+      }
+      return;
     }
 
-    // 1. Ability: Jump (Mega Knight)
+    // 1. Ability: Jump
     if (this.jumpConfig) this.handleJump(game);
-    if (this.isJumping) return; 
+    if (this.isJumping) return;
 
-    // 2. Status Updates
+    // 2. Status & Effects
     this.updateStatus();
-    if (this.effects.aura) this.processAura(game); 
-    
+    this.processActiveEffects(game);
+
     if (this.stunned > 0) {
-        this.resolveCollision(game);
-        return;
+      this.resolveCollision(game);
+      return;
     }
 
     // 3. Speed Calculation
     let speedMult = 1.0;
     let attackSpeedMult = 1.0;
-    if (this.rageBoosted > 0) { speedMult += this.rageAmount; attackSpeedMult += this.rageAmount; }
-    if (this.slowed > 0) { speedMult -= this.slowAmount; attackSpeedMult -= this.slowAmount; }
-    if (speedMult < 0.2) speedMult = 0.2;
-
-    // 4. Ability: Charge (Prince)
-    if (this.chargeConfig) {
-        if (this.isMoving && !this.freezeActive) {
-            this.chargeTimer++; 
-            if (this.chargeTimer > (this.chargeConfig.windup || 90)) this.isCharging = true;
-        } else {
-            this.isCharging = false; this.chargeTimer = 0;
-        }
+    if (this.rageBoosted > 0) {
+      speedMult += this.rageAmount;
+      attackSpeedMult += this.rageAmount;
     }
-    if (this.isCharging) speedMult *= (this.chargeConfig.speedMult || 2.0);
+    if (this.slowed > 0) {
+      speedMult -= this.slowAmount;
+      attackSpeedMult -= this.slowAmount;
+    }
+    if (speedMult < 0.2) speedMult = 0.2;
+    if (attackSpeedMult < 0.2) attackSpeedMult = 0.2; // [FIX] Cegah attack speed negatif/nol
+
+    // 4. Ability: Charge
+    if (this.chargeConfig) {
+      if (this.isMoving && !this.freezeActive) {
+        this.chargeTimer++;
+        if (this.chargeTimer > (this.chargeConfig.windup || 90))
+          this.isCharging = true;
+      } else {
+        this.isCharging = false;
+        this.chargeTimer = 0;
+      }
+    }
+    if (this.isCharging) speedMult *= this.chargeConfig.speedMult || 2.0;
 
     // 5. Apply Movement Stats
     this.speed = this.baseSpeed * speedMult * this.pushFactor;
-    
-    // 6. Spawner Logic
-    if (this.effects.spawner) this.processSpawner(game);
 
-    // 7. AI Logic
+    // 6. AI Logic
     this.findTarget(game);
 
-    // HAPUS LOGIKA SLEEPING DISINI.
-    // Dulu unit diam jika tidak ada teman. Sekarang kita biarkan dia jalan (di blok else bawah).
-
     if (this.target) {
-        this.angle = Math.atan2(this.target.y - this.y, this.target.x - this.x);
-        const dist = Utils.getDist(this, this.target);
-        const reach = (this.range > 0 ? this.range : 10) + this.target.radius + this.radius;
+      this.angle = Math.atan2(this.target.y - this.y, this.target.x - this.x);
+      const dist = Utils.getDist(this, this.target);
+      const reach =
+        (this.range > 0 ? this.range : 10) + this.target.radius + this.radius;
 
-        if (dist <= reach) {
-            this.isMoving = false;
-            
-            if (this.isCharging) this.attackTimer = 0; 
+      if (dist <= reach) {
+        // --- KONDISI: DALAM JARAK SERANG ---
+        this.isMoving = false;
+        this.isAttacking = true; // [FIX] Tetap true selama engaging agar animasi jalan
 
-            if (this.attackTimer > 0) {
-                this.attackTimer -= attackSpeedMult;
-                this.isAttacking = false;
-            } else {
-                this.isAttacking = true;
-                this.executeAttack(game); 
-                this.attackTimer = this.hitSpeed;
-            }
+        if (this.isCharging) this.attackTimer = 0;
+
+        if (this.attackTimer > 0) {
+          // Sedang Cooldown / Reload
+          this.attackTimer -= attackSpeedMult;
         } else {
-            this.isAttacking = false;
-            this.isMoving = true;
-            this.attackTimer = this.firstHitDelay;
-            this.moveTowards(this.target.x, this.target.y, game);
+          // Siap Tembak
+          this.executeAttack(game);
+          this.attackTimer = this.hitSpeed;
         }
-    } else {
-        // NO TARGET -> JALAN MAJU (LANE MOVEMENT)
+      } else {
+        // --- KONDISI: MENGEJAR TARGET ---
         this.isAttacking = false;
         this.isMoving = true;
-        this.attackTimer = this.firstHitDelay;
-        
-        // --- LOGIKA JALAN PERLAHAN (IDLE SUPPORT) ---
-        // Jika unit support tidak punya target teman, dia jalan pelan (50% speed)
-        if (this.targetType === 'allies-only') {
-            this.speed *= 0.5;
+
+        // [FIX] BUG ATTACK SPEED: Jangan reset timer jika cooldown masih panjang
+        // Jika timer > firstHitDelay, biarkan turun alami (cooldown sambil jalan)
+        // Jika timer sudah habis, set ke firstHitDelay (setup time)
+        if (this.attackTimer > this.firstHitDelay) {
+          this.attackTimer -= attackSpeedMult;
+        } else {
+          this.attackTimer = this.firstHitDelay;
         }
 
-        this.laneMovement(game);
+        this.moveTowards(this.target.x, this.target.y, game);
+      }
+    } else {
+      // --- KONDISI: TIDAK ADA TARGET ---
+      this.isAttacking = false;
+      this.isMoving = true;
+      this.attackTimer = this.firstHitDelay;
+
+      // Logika unit support jalan pelan jika tidak ada teman (biar ga mati konyol)
+      if (this.targetType === "allies-only") this.speed *= 0.5;
+
+      this.laneMovement(game);
     }
 
     this.resolveCollision(game);
   }
 
-  // =================================================================
-  // DAMAGE & DEATH (FIXED)
-  // =================================================================
-  takeDamage(amount) {
-    super.takeDamage(amount);
-
-    if (this.dead && !this.deathEffectTriggered) {
-      this.deathEffectTriggered = true;
-
-      // Priority 1: Modular Effects (New System)
-      if (this.effects && this.effects.onDeath) {
-        this.triggerEffectsArea(GAME, "onDeath", this.x, this.y);
-      }
-      // Priority 2: Legacy (Old System Backup)
-      else if (this.deathEffect) {
-        this.doDeathEffect();
-      }
-    }
-  }
-
-  doDeathEffect() {
-    // Fungsi lama untuk compatibility
-    const de = this.deathEffect;
-    if (!de) return;
-
-    if (typeof GAME !== "undefined") {
-      const radiusPx = (de.radius || 3) * CONFIG.gridSize;
-      if (de.type === "explode" || de.dmg) {
-        GAME.dealAreaDamage(
-          this.x,
-          this.y,
-          radiusPx,
-          de.dmg || 0,
-          this.team,
-          "damage"
-        );
-        GAME.effects.push(new Effect(this.x, this.y, radiusPx, "orange"));
-      }
-      if (de.type === "split") {
-        for (let i = 0; i < de.count; i++) {
-          const ox = (Math.random() - 0.5) * 20;
-          const oy = (Math.random() - 0.5) * 20;
-          const u = new Unit(this.x + ox, this.y + oy, this.team, de.unit);
-          u.deployTimer = 20;
-          GAME.units.push(u);
-        }
-      }
-      if (de.type === "spell" && de.spell) {
-        GAME.executeSpellEffect({
-          key: de.spell,
-          x: this.x,
-          y: this.y,
-          team: this.team,
-          radius: radiusPx,
-          overrideDmg: de.amount,
-          overrideDuration: de.duration,
-        });
-      }
-    }
-  }
-
-  triggerEffects(game, triggerName, targetEntity) {
-    if (!this.effects[triggerName]) return;
-
-    this.effects[triggerName].forEach((eff) => {
-      let finalTarget = targetEntity;
-      if (eff.target === "self") finalTarget = this;
-
-      if (eff.type === "damage") {
-        // Jika ada durasi, jadikan Poison/DOT
-        if (eff.duration > 0) {
-          finalTarget.applyPoison(eff.duration, eff.amount);
-        } else {
-          finalTarget.takeDamage(eff.amount);
-        }
-      }
-      if (eff.type === "heal") finalTarget.heal(eff.amount);
-      if (eff.type === "stun")
-        finalTarget.applyStun(eff.duration, eff.visual || "zap");
-      if (eff.type === "slow") finalTarget.applySlow(eff.duration, eff.amount);
-    });
-  }
-  triggerEffectsArea(game, triggerName, x, y, radiusOverride = null) {
-    if (!this.effects[triggerName]) return;
-
-    this.effects[triggerName].forEach((eff) => {
-      const r =
-        (eff.radius || 0) * CONFIG.gridSize ||
-        radiusOverride ||
-        this.splashRadius;
-
-      // 1. SPAWN UNIT (Golem, Witch, Tombstone)
-      if (eff.type === "spawn") {
-        for (let i = 0; i < eff.count; i++) {
-          const ox = (Math.random() - 0.5) * 20;
-          const oy = (Math.random() - 0.5) * 20;
-          const contextGame = game || GAME;
-          if (contextGame) {
-            // Cek tipe data kartu yang akan di-spawn
-            const spawnCardData = CARDS[eff.unit];
-
-            if (spawnCardData && spawnCardData.type === "building") {
-              // Spawn sebagai Building (Diam, punya lifetime) - misal: Phoenix Egg
-              const b = new Building(x + ox, y + oy, this.team, eff.unit);
-              contextGame.buildings.push(b);
-            } else {
-              // Spawn sebagai Unit (Bergerak) - misal: Skeleton, Golemite
-              const u = new Unit(x + ox, y + oy, this.team, eff.unit);
-              u.deployTimer = 20;
-              contextGame.units.push(u);
-            }
-          }
-        }
-        return;
-      }
-
-      // 2. TRIGGER SPELL (FIX: PENDING DELAY SUPPORT)
-      if (eff.type === "spell") {
-        const contextGame = game || GAME;
-        const spellCard = CARDS[eff.spell];
-
-        if (contextGame && spellCard) {
-          // Prioritas Delay:
-          // 1. Custom Delay di effect (misal: deathEffect: { delay: 3 })
-          // 2. Default Delay dari kartu spell
-          // 3. Default 1 detik
-          const delaySec =
-            eff.delay !== undefined
-              ? eff.delay
-              : spellCard.stats.spawnDelay || 1.0;
-
-          // Masukkan ke Pending Spells (Agar muncul indikator visual dulu)
-          contextGame.pendingSpells.push({
-            key: eff.spell,
-            x: x,
-            y: y,
-            team: this.team,
-            timer: delaySec * 60, // Konversi ke frame
-            maxTimer: delaySec * 60,
-            radius: r,
-            overrideDmg: eff.amount, // Override stats
-            overrideDuration: eff.duration,
-          });
-        }
-        return;
-      }
-
-      // 3. DIRECT AREA EFFECT (Damage/Heal/Stun/Slow biasa)
-      this.effects[triggerName].forEach((eff) => {
-        if (eff.type === "spawn" || eff.type === "spell") return; // Skip yg sudah dihandle
-
-        const targets = [
-          ...(game || GAME).units,
-          ...(game || GAME).buildings,
-        ].filter((u) => !u.dead && Utils.getDist({ x, y }, u) <= r);
-
-        targets.forEach((t) => {
-          if (eff.target === "self") return;
-          if (eff.type === "heal" && t.team !== this.team) return;
-          if (eff.type !== "heal" && t.team === this.team) return;
-
-          // Logic Damage/DOT
-          if (eff.type === "damage") {
-            if (eff.duration > 0) t.applyPoison(eff.duration, eff.amount);
-            else t.takeDamage(eff.amount);
-          }
-          if (eff.type === "heal") t.heal(eff.amount);
-          if (eff.type === "stun")
-            t.applyStun(eff.duration, eff.visual || "zap");
-          if (eff.type === "slow") t.applySlow(eff.duration, eff.amount);
-        });
-      });
-    });
-  }
-
-  // =================================================================
-  // TARGETING & MOVEMENT
-  // =================================================================
   findTarget(game) {
-      // Stick to Target Logic
-      if (this.target) {
-          const dist = Utils.getDist(this, this.target);
-          const reach = (this.range > 0 ? this.range : 10) + this.target.radius + this.radius;
-          
-          let stillValid = !this.target.dead && 
-                           !this.target.isHidden && 
-                           dist <= reach + 50 && 
-                           this.isValidTarget(this.target);
-          
-          if (this.targetType === 'allies-only' && this.target.hp >= this.target.maxHp) stillValid = false;
+    // 1. Stick to Target Logic
+    if (this.target) {
+      const dist = Utils.getDist(this, this.target);
+      const reach =
+        (this.range > 0 ? this.range : 10) + this.target.radius + this.radius;
+      let stillValid =
+        !this.target.dead &&
+        !this.target.isHidden && // Cek Hidden saat tracking
+        dist <= reach + 50 &&
+        this.isValidTarget(this.target);
 
-          if (stillValid) return; 
-          
-          this.rampStage = 0;
-          this.target = null;
-          this.isAttacking = false;
-      }
+      if (
+        this.targetType === "allies-only" &&
+        this.target.hp >= this.target.maxHp
+      )
+        stillValid = false;
 
-      let candidates = [];
-      
-      // --- PERBAIKAN LOGIKA ALLIES-ONLY ---
-      if (this.targetType === 'allies-only') {
-          // Hanya cari UNIT teman yang HP-nya belum penuh.
-          // JANGAN masukkan game.buildings atau game.towers.
-          candidates = game.units.filter(u => u.team === this.team && u !== this && u.hp < u.maxHp);
-      } else {
-          // Musuh (Unit, Building, Tower)
-          candidates = [...game.units, ...game.buildings, ...game.towers].filter(e => e.team !== this.team && !e.dead && !e.isHidden);
-      }
+      if (stillValid) return;
 
-      let bestTarget = null;
-      let minDist = 9999;
+      this.rampStage = 0;
+      this.target = null;
+      this.isAttacking = false;
+    }
 
-      for (let c of candidates) {
-          if (this.buildingHunter && !(c instanceof Building) && !(c instanceof Tower)) continue;
-          if (!this.isValidTarget(c)) continue;
+    let candidates = [];
+    const isSupport = this.targetType === "allies-only";
+    const searchRange = isSupport ? this.sightRange * 2.5 : this.sightRange;
 
-          const dist = Utils.getDist(this, c);
-          if (dist <= this.sightRange) {
-              if (dist < minDist) {
-                  minDist = dist;
-                  bestTarget = c;
-              }
+    if (isSupport) {
+      candidates = game.units.filter(
+        (u) => u.team === this.team && u !== this && u.hp < u.maxHp
+      );
+    } else {
+      candidates = [...game.units, ...game.buildings, ...game.towers].filter(
+        (e) => e.team !== this.team && !e.dead && !e.isHidden
+      );
+    }
+
+    let bestTarget = null;
+    let highestScore = -Infinity;
+
+    for (let c of candidates) {
+      if (
+        this.buildingHunter &&
+        !(c instanceof Building) &&
+        !(c instanceof Tower)
+      )
+        continue;
+      if (!this.isValidTarget(c)) continue;
+
+      const dist = Utils.getDist(this, c);
+
+      if (dist <= searchRange) {
+        let score = -dist;
+        if (isSupport) {
+          if (this.targetPreferences.length > 0 && c.tags) {
+            const isPriority = this.targetPreferences.some((prefTag) =>
+              c.tags.includes(prefTag)
+            );
+            if (isPriority) score += 2000;
           }
+          score += c.maxHp;
+        }
+        if (score > highestScore) {
+          highestScore = score;
+          bestTarget = c;
+        }
       }
+    }
 
-      // Global Aggro ke Tower (Hanya untuk penyerang musuh)
-      if (!bestTarget && this.targetType !== 'allies-only') {
-          const globalTargets = [...game.towers, ...game.buildings].filter(t => t.team !== this.team && !t.dead);
-          let globalMin = 9999;
-          for (let t of globalTargets) {
-              const d = Utils.getDist(this, t);
-              if (d < globalMin) { globalMin = d; bestTarget = t; }
-          }
+    // [FIX BUG 2 - PART B] GLOBAL AGGRO CHECK
+    // Saat mencari target jauh (Tower/Building), pastikan tidak menarget Hidden Unit
+    if (!bestTarget && !isSupport) {
+      const globalTargets = [...game.towers, ...game.buildings].filter(
+        (t) => t.team !== this.team && !t.dead && !t.isHidden // <--- TAMBAHKAN INI (PENTING)
+      );
+
+      let globalMin = 9999;
+      for (let t of globalTargets) {
+        // Jika building hunter, abaikan unit (walaupun globalTargets isinya towers/buildings, aman)
+        const d = Utils.getDist(this, t);
+        if (d < globalMin) {
+          globalMin = d;
+          bestTarget = t;
+        }
       }
-      this.target = bestTarget;
+    }
+
+    this.target = bestTarget;
   }
-
   isValidTarget(entity) {
     if (entity.dead || entity.isHidden) return false;
     if (this.targetType === "ground-only" && entity.isAir) return false;
@@ -556,205 +712,188 @@ class Unit extends Entity {
   }
 
   executeAttack(game) {
-      let dmg = this.dmg;
-      
-      // Charge Logic
-      if (this.isCharging && this.chargeConfig) {
-          dmg = this.chargeConfig.dmg || (this.dmg * 2);
-          this.isCharging = false;
-          this.chargeTimer = 0;
-          game.effects.push(new Effect(this.x, this.y, this.radius + 15, "#fff"));
+    let dmg = this.dmg;
+    if (this.isCharging && this.chargeConfig) {
+      dmg = this.chargeConfig.dmg || this.dmg * 2;
+      this.isCharging = false;
+      this.chargeTimer = 0;
+      game.effects.push(new Effect(this.x, this.y, this.radius + 15, "#fff"));
+    }
+
+    const pData = this.projectileData || {};
+
+    // Helper Multi-Target
+    const getMultiTargets = (primaryTarget) => {
+      let targets = [primaryTarget];
+      if (this.multiTarget && this.multiTarget > 1) {
+        const pool =
+          this.targetType === "allies-only"
+            ? game.units
+            : [...game.units, ...game.buildings];
+        const extras = pool
+          .filter(
+            (e) =>
+              e.team ===
+                (this.targetType === "allies-only"
+                  ? this.team
+                  : this.team === 0
+                  ? 1
+                  : 0) &&
+              !e.dead &&
+              !e.isHidden &&
+              e !== primaryTarget &&
+              this.isValidTarget(e) &&
+              Utils.getDist(this, e) <= this.range + 2
+          )
+          .sort((a, b) => Utils.getDist(this, a) - Utils.getDist(this, b))
+          .slice(0, this.multiTarget - 1);
+        targets = targets.concat(extras);
       }
+      return targets;
+    };
 
-      // Ambil data projectile
-      const pData = this.projectileData || {}; 
+    // 1. RAMP DAMAGE (Inferno)
+    if (this.tags.includes("ramp-damage")) {
+      this.rampStage = (this.rampStage || 0) + 1;
+      let rampMult = 1.0;
+      if (this.rampStage > 15) rampMult = 3.0;
+      if (this.rampStage > 30) rampMult = 8.0;
+      dmg *= rampMult;
 
-      // Helper Multi-Target
-      const getMultiTargets = (primaryTarget) => {
-          let targets = [primaryTarget];
-          if (this.multiTarget && this.multiTarget > 1) {
-              const pool = (this.targetType === 'allies-only') ? game.units : [...game.units, ...game.buildings];
-              
-              const extras = pool.filter(e => 
-                  e.team === (this.targetType === 'allies-only' ? this.team : (this.team === 0 ? 1 : 0)) && // Cek Tim
-                  !e.dead && !e.isHidden && e !== primaryTarget && 
-                  this.isValidTarget(e) && 
-                  Utils.getDist(this, e) <= this.range + 2
-              ).sort((a,b) => Utils.getDist(this, a) - Utils.getDist(this, b))
-              .slice(0, this.multiTarget - 1);
-              targets = targets.concat(extras);
-          }
-          return targets;
-      };
-
-      // 1. LOGIKA RAMP DAMAGE (Inferno - Bertahap)
-      if (this.tags.includes('ramp-damage')) {
-          this.rampStage = (this.rampStage || 0) + 1;
-          let rampMult = 1.0;
-          if (this.rampStage > 15) rampMult = 3.0;
-          if (this.rampStage > 30) rampMult = 8.0;
-          dmg *= rampMult;
-          
-          const targets = getMultiTargets(this.target);
-          this.currentTargets = targets; // Simpan untuk visual
-          
-          targets.forEach(t => { if(t) { t.takeDamage(dmg); this.triggerEffects(game, 'onHit', t); } });
-          return;
-      }
-
-      // 2. LOGIKA FLAT BEAM (Laser Biasa / Healing Beam) [BARU]
-      // Cek jika type instant DAN visual beam, TAPI tidak ramp-damage
-      if (pData.type === 'instant' && pData.visual === 'beam') {
-          const targets = getMultiTargets(this.target);
-          this.currentTargets = targets; // Simpan untuk visual
-
-          targets.forEach(t => {
-              if(!t) return;
-              
-              // LOGIKA HEAL vs DAMAGE
-              if (this.targetType === 'allies-only') {
-                  // Jika target teman -> Heal
-                  t.heal(dmg);
-                  // Trigger effect 'onHit' (misal: buff)
-                  this.triggerEffects(game, 'onHit', t);
-              } else {
-                  // Jika musuh -> Damage
-                  t.takeDamage(dmg);
-                  this.triggerEffects(game, 'onHit', t);
-              }
-          });
-          return; // Selesai, visual digambar renderer
-      }
-
-      // 3. INSTANT ATTACK LAIN (Petir/Zap)
-      if (pData.type === 'instant') {
-          const targets = getMultiTargets(this.target);
-          targets.forEach(t => {
-              if(!t) return;
-              t.takeDamage(dmg);
-              this.triggerEffects(game, 'onHit', t);
-              if (pData.visual === 'lightning') {
-                  game.effects.push(new LightningEffect(this.x, this.y - 20, t.x, t.y));
-              }
-          });
-      }
-      
-      // 4. MELEE ATTACK
-      else if (this.isMelee && !pData.type) {
-          if (this.splashRadius > 0) {
-              game.dealAreaDamage(this.x, this.y, this.splashRadius, dmg, this.team, 'damage', this.targetType !== 'ground-only');
-              game.effects.push(new Effect(this.x, this.y, this.splashRadius, "orange"));
-              this.triggerEffectsArea(game, 'onHit', this.x, this.y, this.splashRadius);
-          } else {
-              if (this.target) {
-                  this.target.takeDamage(dmg);
-                  this.triggerEffects(game, 'onHit', this.target);
-              }
-          }
-          if (this.tags.includes('kamikaze')) this.takeDamage(9999);
-      } 
-      
-      // 5. PROJECTILE ATTACK (Update: Support Multi-Count & Spread)
-      else {
-          if (this.key === 'executioner') this.hasWeapon = false; 
-
-          const targets = getMultiTargets(this.target);
-          const pType = pData.type || "normal";
-          const pSpeed = pData.speed || 7;
-          const pMaxRange = pData.maxRange ? (pData.maxRange * CONFIG.gridSize) : this.range;
-          const onHitEffects = this.effects.onHit || [];
-
-          // AMBIL CONFIG MULTI-PROJECTILE
-          const pCount = pData.count || 1;   // Jumlah peluru (Default 1)
-          const pSpread = pData.spread || 0; // Jarak sebaran (Default 0)
-
-          targets.forEach(t => {
-              if(!t) return;
-
-              // LOOP UNTUK MEMBUAT BANYAK PELURU
-              for (let i = 0; i < pCount; i++) {
-                  
-                  // Hitung Offset (Geseran) Posisi Awal
-                  // Agar peluru muncul berjejer (Shotgun/Dual Wield)
-                  // Jika count 1, offset 0. Jika count 3, offset: -spread, 0, +spread.
-                  let spreadOffset = 0;
-                  if (pCount > 1) {
-                      spreadOffset = (i - (pCount - 1) / 2) * (pSpread * 10); 
-                  }
-
-                  // Geser posisi spawn tegak lurus dari arah hadap unit
-                  // Math.PI/2 = 90 derajat
-                  const perpAngle = this.angle + Math.PI / 2;
-                  
-                  const spawnX = this.x + Math.cos(perpAngle) * spreadOffset;
-                  const spawnY = this.y + Math.sin(perpAngle) * spreadOffset;
-
-                  const p = new Projectile(
-                      spawnX, spawnY, t, dmg, this.team, 
-                      false, this.splashRadius > 0, false, this.splashRadius, 2, 
-                      false, 0, 0, 
-                      pType, pSpeed, pMaxRange, this, onHitEffects
-                  );
-                  p.hitAir = this.targetType !== 'ground-only';
-                  
-                  // Sedikit delay visual agar tidak keluar barengan persis (Opsional)
-                  // p.visualDelay = i * 2; 
-                  
-                  game.projectiles.push(p);
-              }
-          });
-      }
-  }
-  processAura(game) {
-    this.effects.aura.forEach((eff) => {
-      const radius = (eff.radius || 3) * CONFIG.gridSize;
-
-      if (eff.target === "self") {
-        if (eff.type === "rage") this.applyRage(eff.amount);
-        // Visual Aura Self
-        if (game.frameCount % 30 === 0) {
-          game.effects.push(
-            new Effect(this.x, this.y, this.radius + 5, "rgba(255, 0, 0, 0.3)")
-          );
-        }
-        return;
-      }
-
-      const targets = [...game.units, ...game.buildings].filter(
-        (u) => !u.dead && Utils.getDist(this, u) <= radius
-      );
+      const targets = getMultiTargets(this.target);
+      this.currentTargets = targets;
       targets.forEach((t) => {
-        if (eff.target === "enemy" && t.team === this.team) return;
-        if (eff.target === "ally" && t.team !== this.team) return;
-        if (eff.type === "damage") t.takeDamage(eff.amount / 60);
-        if (eff.type === "heal") t.heal(eff.amount / 60);
-        if (eff.type === "slow") t.applySlow(0.1, eff.amount);
-        if (eff.type === "rage") t.applyRage(eff.amount);
+        if (t) {
+          t.takeDamage(dmg);
+          this.triggerEffects(game, "onHit", t);
+        }
       });
-      if (game.frameCount % 30 === 0) {
-        const color =
-          eff.type === "heal" ? "rgba(0,255,0,0.1)" : "rgba(255,255,255,0.1)";
-        game.effects.push(new Effect(this.x, this.y, radius, color));
-      }
-    });
-  }
+      return;
+    }
 
-  processSpawner(game) {
-    const sp = this.effects.spawner;
-    if (!this.spawnTimer) this.spawnTimer = 0;
-    this.spawnTimer++;
-    if (this.spawnTimer >= sp.interval * 60) {
-      this.spawnTimer = 0;
-      for (let i = 0; i < sp.count; i++) {
-        const u = new Unit(
-          this.x + (Math.random() - 0.5) * 20,
-          this.y,
-          this.team,
-          sp.unit
-        );
-        u.deployTimer = 20;
-        game.units.push(u);
+    // 2. BEAM (Flat / Heal)
+    if (pData.type === "instant" && pData.visual === "beam") {
+      const targets = getMultiTargets(this.target);
+      this.currentTargets = targets;
+      targets.forEach((t) => {
+        if (!t) return;
+        if (this.targetType === "allies-only") {
+          t.heal(dmg);
+          this.triggerEffects(game, "onHit", t);
+        } else {
+          t.takeDamage(dmg);
+          this.triggerEffects(game, "onHit", t);
+        }
+      });
+      return;
+    }
+
+    // 3. INSTANT (Zap)
+    if (pData.type === "instant") {
+      const targets = getMultiTargets(this.target);
+      targets.forEach((t) => {
+        if (!t) return;
+        t.takeDamage(dmg);
+        this.triggerEffects(game, "onHit", t);
+        if (pData.visual === "lightning")
+          game.effects.push(new LightningEffect(this.x, this.y - 20, t.x, t.y));
+      });
+    }
+    // 4. MELEE
+    // 4. MELEE ATTACK (REMASTERED)
+    else if (this.isMelee && !pData.type) {
+      // A. TYPE: SINGLE TARGET
+      if (this.meleeType === "single") {
+        if (this.target) {
+          this.target.takeDamage(dmg);
+          this.triggerEffects(game, "onHit", this.target);
+        }
       }
+
+      // B. TYPE: AREA (CIRCULAR & CLEAVE)
+      else {
+        let hitX = this.x;
+        let hitY = this.y;
+
+        // [NEW] TYPE: CLEAVE (Area Depan)
+        // Pusat ledakan digeser ke depan unit sesuai arah hadap (this.angle)
+        // Offset dihitung agar area damage dimulai tepat dari depan badan unit
+        if (this.meleeType === "cleave") {
+          const offset = this.radius + this.splashRadius * 0.5;
+          hitX = this.x + Math.cos(this.angle) * offset;
+          hitY = this.y + Math.sin(this.angle) * offset;
+        }
+
+        // [OLD] TYPE: CIRCULAR (Valkyrie)
+        // Pusat ledakan tetap di tengah unit (this.x, this.y)
+        // Tidak perlu kode tambahan karena default hitX/hitY sudah diset this.x/this.y
+
+        // Lakukan Damage Area di titik yang sudah ditentukan
+        game.dealAreaDamage(
+          hitX,
+          hitY,
+          this.splashRadius,
+          dmg,
+          this.team,
+          "damage",
+          this.targetType !== "ground-only"
+        );
+
+        // Visual Effect di lokasi pukulan
+        game.effects.push(new Effect(hitX, hitY, this.splashRadius, "orange"));
+        this.triggerEffectsArea(game, "onHit", hitX, hitY, this.splashRadius);
+      }
+
+      // Kamikaze Logic
+      if (this.tags.includes("kamikaze")) this.takeDamage(9999);
+    }
+    // 5. PROJECTILE
+    else {
+      if (this.key === "executioner") this.hasWeapon = false;
+      const targets = getMultiTargets(this.target);
+      const pType = pData.type || "normal";
+      const pSpeed = pData.speed || 7;
+      const pMaxRange = pData.maxRange
+        ? pData.maxRange * CONFIG.gridSize
+        : this.range;
+      const onHitEffects = this.effects.onHit || [];
+      const pCount = pData.count || 1;
+      const pSpread = pData.spread || 0;
+
+      targets.forEach((t) => {
+        if (!t) return;
+        for (let i = 0; i < pCount; i++) {
+          let spreadOffset = 0;
+          if (pCount > 1)
+            spreadOffset = (i - (pCount - 1) / 2) * (pSpread * 10);
+          const perpAngle = this.angle + Math.PI / 2;
+          const spawnX = this.x + Math.cos(perpAngle) * spreadOffset;
+          const spawnY = this.y + Math.sin(perpAngle) * spreadOffset;
+
+          const p = new Projectile(
+            spawnX,
+            spawnY,
+            t,
+            dmg,
+            this.team,
+            false,
+            this.splashRadius > 0,
+            false,
+            this.splashRadius,
+            2,
+            false,
+            0,
+            0,
+            pType,
+            pSpeed,
+            pMaxRange,
+            this,
+            onHitEffects
+          );
+          p.hitAir = this.targetType !== "ground-only";
+          game.projectiles.push(p);
+        }
+      });
     }
   }
 
@@ -815,92 +954,74 @@ class Unit extends Entity {
     }
   }
 
-  moveTowards(tx, ty, game) {
-    const moveDist = Math.hypot(this.x - this.lastX, this.y - this.lastY);
-    if (moveDist < 0.5 && this.isMoving) this.stuckTimer++;
-    else this.stuckTimer = 0;
-    this.lastX = this.x;
-    this.lastY = this.y;
+  laneMovement(game) {
+    // === LOGIKA BARU: SMART SUPPORT AI ===
+    if (this.targetType === "allies-only") {
+      // 1. Cari teman terdekat (apapun kondisinya) untuk diikuti/di-escort
+      let closestAlly = null;
+      let minAllyDist = 9999;
 
-    let moveAngle = Math.atan2(ty - this.y, tx - this.x);
+      // Cari unit teman yang TIDAK bertipe 'allies-only' (jangan saling follow sesama healer, nanti muter2)
+      // Dan pastikan unit itu ada di DEPAN kita (y lebih kecil jika team 0, y lebih besar jika team 1)
+      const forwardDir = this.team === 0 ? -1 : 1;
 
-    // LOGIKA ANTI-STUCK (Random wiggle jika macet parah)
-    if (this.stuckTimer > 30) {
-      moveAngle += (Math.random() - 0.5) * 2.0;
-      if (this.stuckTimer > 60) this.stuckTimer = 0;
-    }
+      for (let u of game.units) {
+        if (
+          u !== this &&
+          u.team === this.team &&
+          !u.dead &&
+          u.targetType !== "allies-only"
+        ) {
+          const d = Utils.getDist(this, u);
+          // Prioritaskan unit yang jaraknya dekat
+          if (d < minAllyDist) {
+            minAllyDist = d;
+            closestAlly = u;
+          }
+        }
+      }
 
-    // LOGIKA HINDARI BANGUNAN (Pathfinding Sederhana)
-    if (game && !this.isAir) {
-      const obstacles = [...game.buildings, ...game.towers].filter(
-        (b) => !b.dead
+      // KONDISI A: Ada teman untuk diikuti (Follow Leader)
+      if (closestAlly) {
+        // Bergerak menuju teman, tapi jaga jarak sedikit (jangan nempel banget)
+        const safeDistance = closestAlly.radius + this.radius + 30;
+        if (minAllyDist > safeDistance) {
+          this.moveTowards(closestAlly.x, closestAlly.y, game);
+        } else {
+          // Jika sudah dekat teman, diam atau gerak pelan mengikuti arusnya
+          this.isMoving = false;
+        }
+        return;
+      }
+
+      // KONDISI B: Sendirian -> Mundur ke Tower Terdekat (Safety)
+      let closestTower = null;
+      let minTowerDist = 9999;
+      const myTowers = game.towers.filter(
+        (t) => t.team === this.team && !t.dead
       );
 
-      for (let b of obstacles) {
-        const dist = Utils.getDist(this, b);
-        const avoidDist = b.radius + this.radius + 15; // Jarak aman
-
-        if (dist < avoidDist) {
-          // Hitung vektor dari pusat bangunan ke unit
-          const angleFromBuilding = Math.atan2(this.y - b.y, this.x - b.x);
-
-          // Periksa apakah bangunan ada "di depan" arah jalan kita
-          const angleDiff = Math.abs(
-            moveAngle - Math.atan2(b.y - this.y, b.x - this.x)
-          );
-
-          // Jika bangunan menghalangi jalan (di depan)
-          if (angleDiff < Math.PI / 2) {
-            // Geser sudut gerak menjauhi bangunan
-            // Kita blend sudut tujuan asli dengan sudut menghindar
-            // Semakin dekat, semakin kuat menghindarnya
-            const avoidanceStrength = 1.5 * (1 - dist / avoidDist);
-
-            // Tentukan belok kiri atau kanan yang lebih efisien
-            let avoidAngle = angleFromBuilding;
-
-            // Smooth steering
-            moveAngle = Utils.lerpAngle(moveAngle, avoidAngle, 0.2);
-          }
+      for (let t of myTowers) {
+        const d = Utils.getDist(this, t);
+        if (d < minTowerDist) {
+          minTowerDist = d;
+          closestTower = t;
         }
+      }
+
+      if (closestTower) {
+        // Jika jauh dari tower, jalan pulang
+        if (minTowerDist > 60) {
+          this.moveTowards(closestTower.x, closestTower.y, game);
+        } else {
+          // Sudah aman di dekat tower, diam.
+          this.isMoving = false;
+        }
+        return;
       }
     }
 
-    // Set angle akhir
-    this.angle = moveAngle;
-
-    // ... (Logika Jembatan/Sungai Tetap Sama - Copy paste bagian bawah ini dari kode sebelumnya)
-    if (!this.isAir) {
-      const riverY = 350;
-      if (this.tags.includes("river-jumper")) {
-        if (Math.abs(this.y - riverY) < 35) {
-          const onLeftBridge = this.x > 70 && this.x < 130;
-          const onRightBridge = this.x > 310 && this.x < 370;
-          if (!onLeftBridge && !onRightBridge) this.speed *= 0.5;
-        }
-      } else {
-        const isCrossing =
-          (this.y < riverY && ty > riverY) || (this.y > riverY && ty < riverY);
-        if (isCrossing && !this.canJumpRiver) {
-          const bX =
-            Math.abs(this.x - 100) < Math.abs(this.x - 340) ? 100 : 340;
-          const distToBridgeX = Math.abs(this.x - bX);
-          if (distToBridgeX > 20) {
-            const bridgeEntryY = riverY + (this.y < riverY ? -25 : 25);
-            this.angle = Math.atan2(bridgeEntryY - this.y, bX - this.x);
-          } else {
-            this.angle = Math.atan2(ty - this.y, 0);
-            const xCorrection = (bX - this.x) * 0.05;
-            this.x += xCorrection;
-          }
-        }
-      }
-    }
-    this.x += Math.cos(this.angle) * this.speed;
-    this.y += Math.sin(this.angle) * this.speed;
-  }
-
-  laneMovement(game) {
+    // === LOGIKA LAMA (NORMAL UNIT) ===
     const towers = game.towers.filter((t) => t.team !== this.team && !t.dead);
     const isLeftLane = this.x < 200;
     const lanePrincess = towers.find(
@@ -908,6 +1029,7 @@ class Unit extends Entity {
     );
     const kingTower = towers.find((t) => t.type === "king");
     let target = lanePrincess || kingTower;
+
     if (!target) {
       let minD = 9999;
       for (let t of towers) {
@@ -918,6 +1040,7 @@ class Unit extends Entity {
         }
       }
     }
+
     if (target) {
       this.moveTowards(target.x, target.y, game);
     } else {
@@ -927,29 +1050,170 @@ class Unit extends Entity {
     }
   }
 
+  // DALAM FILE ENTITY.JS - CLASS UNIT
+
+  moveTowards(tx, ty, game) {
+    // 1. DETEKSI STUCK YANG LEBIH PINTAR (Accumulative)
+    const moveDist = Math.hypot(this.x - this.lastX, this.y - this.lastY);
+    
+    // Jika gerak lambat sekali (kurang dari 20% speed asli), anggap stuck
+    if (moveDist < (this.speed * 0.2)) {
+        this.stuckTimer += 2; // Naik cepat
+    } else {
+        if (this.stuckTimer > 0) this.stuckTimer--; // Turun perlahan (Hysteresis)
+    }
+    
+    this.lastX = this.x; 
+    this.lastY = this.y;
+
+    // =========================================================
+    // VEKTOR BASE NAVIGATION (Target + Avoidance + Bridge)
+    // =========================================================
+
+    // A. Vektor Menuju Target (Normalisasi)
+    let dirX = tx - this.x;
+    let dirY = ty - this.y;
+    const distToTarget = Math.hypot(dirX, dirY);
+    if (distToTarget > 0) {
+        dirX /= distToTarget;
+        dirY /= distToTarget;
+    }
+
+    // B. Vektor Penghindaran (Avoidance Force)
+    let pushX = 0;
+    let pushY = 0;
+
+    if (game && !this.isAir) {
+      const obstacles = [...game.buildings, ...game.towers].filter((b) => !b.dead && !b.isHidden);
+      
+      for (let b of obstacles) {
+        const dist = Utils.getDist(this, b);
+        // Radius deteksi agak besar agar kurvanya mulus (smooth turn)
+        const avoidanceRadius = b.radius + this.radius + 15; 
+
+        if (dist < avoidanceRadius) {
+           // Vektor tolak dari pusat gedung ke unit
+           let awayX = this.x - b.x;
+           let awayY = this.y - b.y;
+           
+           // Normalisasi
+           const distAway = Math.hypot(awayX, awayY);
+           if (distAway > 0) {
+               awayX /= distAway;
+               awayY /= distAway;
+           }
+
+           // Kekuatan tolak: Semakin dekat, semakin kuat (Exponential)
+           // Ini mencegah "masuk" ke dalam gedung
+           const force = Math.pow((avoidanceRadius - dist) / avoidanceRadius, 2) * 5.0; 
+           
+           pushX += awayX * force;
+           pushY += awayY * force;
+        }
+      }
+    }
+
+    // C. Gabungkan Vektor (Target + Avoidance)
+    let finalDirX = dirX + pushX;
+    let finalDirY = dirY + pushY;
+
+    // D. Logika Anti-Stuck Sempurna (Random Noise)
+    // Jika stuck timer tinggi, tambahkan "noise" tegak lurus untuk memecah kebuntuan
+    if (this.stuckTimer > 30) {
+        const noiseAngle = (Math.random() - 0.5) * Math.PI; // Random 90 derajat
+        finalDirX += Math.cos(noiseAngle) * 3.0; // Dorongan kuat acak
+        finalDirY += Math.sin(noiseAngle) * 3.0;
+    }
+
+    // E. Logika Jembatan (Bridge Funneling)
+    // Hanya override jika TIDAK sedang menghindari gedung (pushX/Y kecil) 
+    // dan BUKAN unit pelompat sungai/udara
+    const isAvoidanceActive = (Math.abs(pushX) > 0.1 || Math.abs(pushY) > 0.1);
+    
+    if (!this.isAir && !isAvoidanceActive) {
+      const riverY = 350;
+      // Jika Hog Rider (river-jumper), dia bebas, tidak perlu dipaksa lewat jembatan
+      if (!this.tags.includes("river-jumper")) {
+          const isCrossing = (this.y < riverY && ty > riverY) || (this.y > riverY && ty < riverY);
+          
+          if (isCrossing && !this.canJumpRiver) {
+            const bX = Math.abs(this.x - 100) < Math.abs(this.x - 340) ? 100 : 340; // Jembatan terdekat
+            const distToBridgeX = Math.abs(this.x - bX);
+            
+            if (distToBridgeX > 15) {
+              // Arahkan vektor ke mulut jembatan
+              const bridgeEntryY = riverY + (this.y < riverY ? -40 : 40);
+              let bridgeDirX = bX - this.x;
+              let bridgeDirY = bridgeEntryY - this.y;
+              const bDist = Math.hypot(bridgeDirX, bridgeDirY);
+              
+              // Ganti vektor final sepenuhnya ke arah jembatan
+              finalDirX = bridgeDirX / bDist;
+              finalDirY = bridgeDirY / bDist;
+            } else {
+              // Sudah di jembatan: Luruskan Y, koreksi X pelan-pelan
+              finalDirX = (bX - this.x) * 0.2; // Koreksi X soft
+              finalDirY = (ty - this.y) > 0 ? 1 : -1; // Y lurus
+            }
+          }
+      }
+    }
+
+    // =========================================================
+    // EKSEKUSI GERAKAN (SMOOTHING)
+    // =========================================================
+
+    const targetAngle = Math.atan2(finalDirY, finalDirX);
+
+    // [FIX JITTER] SMOOTH ROTATION
+    // Jangan snap sudut langsung. Gunakan lerp untuk memutar badan perlahan.
+    // 0.2 = Responsive tapi tidak kejang. 
+    // Jika stuck, putar lebih cepat (0.5) agar bisa lepas.
+    const turnSpeed = this.stuckTimer > 10 ? 0.5 : 0.2;
+    this.angle = Utils.lerpAngle(this.angle, targetAngle, turnSpeed);
+
+    // Gerak maju sesuai sudut hadap (seperti mobil/tank)
+    // Ini menjamin unit tidak "sliding" ke samping, tapi benar-benar berjalan ke depan
+    this.x += Math.cos(this.angle) * this.speed;
+    this.y += Math.sin(this.angle) * this.speed;
+  }
+
   resolveCollision(game) {
-    const others = [...game.units, ...game.buildings];
+    const others = [...game.units, ...game.buildings]; // Tower biasanya statis jadi jarang perlu resolve fisik unit vs tower disini (towers dihandle terpisah atau di moveTowards)
+
     for (let u of others) {
       if (u === this || u.dead) continue;
+
+      // [FIX BUG 2 - PART A] Jangan tabrak bangunan yang sedang sembunyi
+      if (u.isHidden) continue;
+
       const iAmAir = this.isAir;
       const uIsAir = u.tags ? u.tags.includes("air") : false;
       const uIsBuilding = u instanceof Building;
+
       if (iAmAir !== uIsAir && !uIsBuilding) continue;
       if (iAmAir && uIsBuilding) continue;
+
       const dist = Utils.getDist(this, u);
       const minDist = this.radius + u.radius;
+
       if (dist < minDist) {
         const angle = Math.atan2(this.y - u.y, this.x - u.x);
         const overlap = minDist - dist;
-        let uMass = u instanceof Unit ? u.mass : 9999;
+
+        let uMass = u instanceof Unit ? u.mass : 9999; // Building mass infinity
         const myMass = this.mass;
         const totalMass = myMass + uMass;
         const myPushRatio = uMass / totalMass;
+
         this.x += Math.cos(angle) * overlap * myPushRatio;
         this.y += Math.sin(angle) * overlap * myPushRatio;
+
         if (u instanceof Unit) this.pushFactor = myMass > uMass ? 0.9 : 0.5;
       }
     }
+
+    // Collision vs Towers (Static)
     if (!this.isAir) {
       for (let t of game.towers) {
         if (t.dead) continue;
@@ -965,14 +1229,14 @@ class Unit extends Entity {
     }
   }
 }
-
-// DALAM FILE ENTITY.JS
-
 class Building extends Entity {
   constructor(x, y, team, key) {
     super(x, y, team);
     const data = CARDS[key];
-    if (!data) { this.dead = true; return; }
+    if (!data) {
+      this.dead = true;
+      return;
+    }
     this.key = key;
     this.maxHp = data.stats.hp || 100;
     this.hp = this.maxHp;
@@ -987,54 +1251,37 @@ class Building extends Entity {
     this.target = null;
     this.attackTimer = 0;
     this.color = data.color || "#888";
-    this.isSpawner = this.tags.includes("spawner");
     this.isRampUp = this.tags.includes("ramp-damage");
     this.isHideIdle = this.tags.includes("hide-when-idle");
-    
-    // --- AMBIL DATA PROJECTILE ---
-    this.projData = data.stats.projectile || { type: 'normal', speed: 7 };
-    
-    this.spawnUnitKey = data.stats.spawnUnitKey;
-    this.spawnCount = data.stats.spawnCount || 1;
-    this.spawnInterval = (data.stats.spawnInterval || 5) * 60;
-    this.spawnTimer = 0;
+
+    this.projData = data.stats.projectile || { type: "normal", speed: 7 };
     this.stunDuration = data.stats.stunDuration || 0;
     this.rampStage = 0;
     this.angle = -Math.PI / 2;
+
+    // --- INHERITED EFFECTS ---
     this.effects = data.effects || {};
   }
-  
+
   update(game) {
-    if (this.deployTimer > 0) { this.deployTimer--; return; }
+    if (this.deployTimer > 0) {
+      this.deployTimer--;
+      return;
+    }
+
     this.updateStatus();
+    this.processActiveEffects(game); // Process Spawner / Aura for Building
+
     if (this.stunned > 0) return;
 
     this.lifetime--;
-    this.hp -= this.maxHp / this.maxLifetime; 
+    this.hp -= this.maxHp / this.maxLifetime;
 
-    // Trigger Death
-    if (this.lifetime <= 0 || this.hp <= 0) { 
-        this.dead = true; 
-        if (this.effects.onDeath) {
-             const contextGame = game || GAME;
-             this.effects.onDeath.forEach(eff => {
-                 if (eff.type === 'spawn') {
-                     for(let i=0; i<eff.count; i++) {
-                         const ox = (Math.random()-0.5)*10;
-                         const u = new Unit(this.x + ox, this.y, this.team, eff.unit);
-                         u.deployTimer = 20; contextGame.units.push(u);
-                     }
-                 }
-                 if (eff.type === 'spell') {
-                      contextGame.pendingSpells.push({
-                        key: eff.spell, x: this.x, y: this.y, team: this.team,
-                        timer: 60, maxTimer: 60, radius: (eff.radius||3)*CONFIG.gridSize,
-                        overrideDmg: eff.amount, overrideDuration: eff.duration
-                     });
-                 }
-             });
-        }
-        return; 
+    if (this.lifetime <= 0 || this.hp <= 0) {
+      this.dead = true;
+      this.hp = 0;
+      this.handleDeathEffect();
+      return;
     }
 
     let speedMult = 1.0;
@@ -1043,22 +1290,11 @@ class Building extends Entity {
 
     if (this.attackTimer > 0) this.attackTimer -= speedMult;
 
-    // Spawner Logic
-    if (this.effects.spawner) {
-        const sp = this.effects.spawner;
-        if (!this.spawnTimer) this.spawnTimer = 0;
-        this.spawnTimer += speedMult;
-        if (this.spawnTimer >= sp.interval * 60) {
-            this.spawnTimer = 0;
-            this.spawnUnit(game, sp.unit, sp.count);
-        }
-    }
-
-    // Attack Logic
     if (this.range > 0) {
       this.updateTargeting(game);
       if (this.isHideIdle) this.isHidden = this.target === null;
-      if (this.target) this.angle = Math.atan2(this.target.y - this.y, this.target.x - this.x);
+      if (this.target)
+        this.angle = Math.atan2(this.target.y - this.y, this.target.x - this.x);
 
       if (this.target && this.attackTimer <= 0) {
         this.doAttack(game);
@@ -1069,77 +1305,84 @@ class Building extends Entity {
     }
   }
 
-  // ... (spawnUnit & takeDamage tetap sama, bisa dicopy dari sebelumnya) ...
-  takeDamage(amount) { super.takeDamage(amount); }
-  spawnUnit(game, unitKey, count) { /* sama seperti sebelumnya */ 
-    if(!unitKey) return;
-    for (let i = 0; i < (count || 1); i++) {
-      const u = new Unit(this.x + (Math.random()-0.5)*10, this.y + 20, this.team, unitKey);
-      u.deployTimer = 10; game.units.push(u);
-    }
-  }
-
   updateTargeting(game) {
-    if (this.target && (this.target.dead || this.target.isHidden || Utils.getDist(this, this.target) > this.range)) {
-      this.target = null; this.rampStage = 0;
+    if (
+      this.target &&
+      (this.target.dead ||
+        this.target.isHidden ||
+        Utils.getDist(this, this.target) > this.range)
+    ) {
+      this.target = null;
+      this.rampStage = 0;
     }
     if (!this.target) {
-      const enemies = [...game.units, ...game.towers, ...game.buildings].filter(e => e.team !== this.team && !e.dead && !e.isHidden);
-      let closest = null; let minD = this.range;
+      const enemies = [...game.units, ...game.towers, ...game.buildings].filter(
+        (e) => e.team !== this.team && !e.dead && !e.isHidden
+      );
+      let closest = null;
+      let minD = this.range;
       for (let e of enemies) {
         if (!e.tags) e.tags = [];
         if (!this.tags.includes("air-target") && e.isAir) continue;
-        const dist = Utils.getDist(this, e) - e.radius; 
-        if (dist <= minD) { minD = dist; closest = e; }
+        const dist = Utils.getDist(this, e) - e.radius;
+        if (dist <= minD) {
+          minD = dist;
+          closest = e;
+        }
       }
       this.target = closest;
     }
   }
 
-  // --- MODULAR ATTACK SYSTEM FOR BUILDINGS ---
   doAttack(game) {
     if (!this.target) return;
-
-    let currentDmg = this.dmg;
     const spawnX = this.x + Math.cos(this.angle) * 20;
     const spawnY = this.y + Math.sin(this.angle) * 20;
 
-    // 1. RAMP DAMAGE (Inferno Style)
+    // RAMP
     if (this.isRampUp) {
       this.rampStage += 1;
       let rampMult = 1.0;
-      if (this.rampStage > 30) rampMult = 3.0; // Tier 2
-      if (this.rampStage > 90) rampMult = 8.0; // Tier 3
-      currentDmg = this.dmg * rampMult;
-      
-      // Inferno Beam adalah tipe Instant hit
+      if (this.rampStage > 30) rampMult = 3.0;
+      if (this.rampStage > 90) rampMult = 8.0;
+      const currentDmg = this.dmg * rampMult;
       this.target.takeDamage(currentDmg);
-      return; // Selesai, visual digambar di renderer
-    } 
-    
-    // 2. INSTANT ATTACK (Tesla/Lightning)
-    else if (this.projData.type === 'instant') {
-        this.target.takeDamage(this.dmg);
-        
-        // Efek Stun
-        if (this.tags.includes('stun-effect')) {
-            this.target.applyStun(this.stunDuration || 0.5, "zap");
-        }
-        
-        // Visual Lightning
-        if (this.projData.visual === 'lightning') {
-             game.effects.push(new LightningEffect(this.x, this.y - 30, this.target.x, this.target.y));
-        }
-    } 
-    
-    // 3. NORMAL PROJECTILE (Cannon/Xbow)
+      return;
+    }
+
+    // INSTANT
+    else if (this.projData.type === "instant") {
+      this.target.takeDamage(this.dmg);
+      if (this.tags.includes("stun-effect")) {
+        this.target.applyStun(this.stunDuration || 0.5, "zap");
+      }
+      if (this.projData.visual === "lightning") {
+        game.effects.push(
+          new LightningEffect(this.x, this.y - 30, this.target.x, this.target.y)
+        );
+      }
+    }
+    // PROJECTILE
     else {
-      game.projectiles.push(new Projectile(
-          spawnX, spawnY, this.target, currentDmg, this.team, 
-          false, false, false, 0, 2, false, 0, 0, 
-          this.projData.type || 'normal', 
+      game.projectiles.push(
+        new Projectile(
+          spawnX,
+          spawnY,
+          this.target,
+          this.dmg,
+          this.team,
+          false,
+          false,
+          false,
+          0,
+          2,
+          false,
+          0,
+          0,
+          this.projData.type || "normal",
           this.projData.speed || 7
-      ));
+        )
+      );
     }
   }
 }
@@ -1161,32 +1404,45 @@ class Tower extends Entity {
     this.angle = team === 0 ? -Math.PI / 2 : Math.PI / 2;
     this.target = null;
     this.tags = [];
-    
-    // --- AMBIL DATA PROJECTILE UNTUK TOWER ---
-    this.projData = stats.projectile || { type: 'normal', speed: 7 };
-    this.targetType = stats.targetType || 'ground-air';
+
+    this.projData = stats.projectile || { type: "normal", speed: 7 };
+    this.targetType = stats.targetType || "ground-air";
+
+    // Tower juga bisa punya efek jika dikonfigurasi
+    this.effects = {};
   }
 
   update(game) {
     this.updateStatus();
+    this.processActiveEffects(game);
+
     if (this.stunned > 0) return;
 
     if (this.type === "king" && !this.active) {
-        const princessAlive = game.towers.filter(t => t.team === this.team && t.type === "princess" && !t.dead).length;
-        if (this.hp < this.maxHp || princessAlive < 2) { this.active = true; this.activationTimer = 120; }
+      const princessAlive = game.towers.filter(
+        (t) => t.team === this.team && t.type === "princess" && !t.dead
+      ).length;
+      if (this.hp < this.maxHp || princessAlive < 2) {
+        this.active = true;
+        this.activationTimer = 120;
+      }
     }
     if (this.activationTimer > 0) this.activationTimer--;
 
     this.target = null;
     if (this.active) {
-      const enemies = [...game.units, ...game.buildings].filter(u => u.team !== this.team && !u.dead && !u.isHidden);
-      let closest = null; let minD = this.range;
+      const enemies = [...game.units, ...game.buildings].filter(
+        (u) => u.team !== this.team && !u.dead && !u.isHidden
+      );
+      let closest = null;
+      let minD = this.range;
       for (let e of enemies) {
-        // Cek target type (King Tower ground-air)
-        if (this.targetType === 'ground-only' && e.isAir) continue;
-
-        const d = Utils.getDist(this, e) - e.radius; 
-        if (d <= minD) { minD = d; closest = e; }
+        if (this.targetType === "ground-only" && e.isAir) continue;
+        const d = Utils.getDist(this, e) - e.radius;
+        if (d <= minD) {
+          minD = d;
+          closest = e;
+        }
       }
       this.target = closest;
 
@@ -1197,7 +1453,7 @@ class Tower extends Entity {
       if (this.target) {
         this.angle = Math.atan2(this.target.y - this.y, this.target.x - this.x);
         if (this.attackTimer <= 0) {
-          this.doAttack(game); // Panggil Modular Attack Logic
+          this.doAttack(game);
           this.attackTimer = this.hitSpeed;
         }
       }
@@ -1211,28 +1467,38 @@ class Tower extends Entity {
     }
   }
 
-  // --- MODULAR ATTACK SYSTEM FOR TOWERS ---
   doAttack(game) {
-      if (!this.target) return;
-      const spawnX = this.x + Math.cos(this.angle) * 20;
-      const spawnY = this.y + Math.sin(this.angle) * 20;
+    if (!this.target) return;
+    const spawnX = this.x + Math.cos(this.angle) * 20;
+    const spawnY = this.y + Math.sin(this.angle) * 20;
 
-      // 1. INSTANT ATTACK (Misal Tesla Tower Custom)
-      if (this.projData.type === 'instant') {
-          this.target.takeDamage(this.dmg);
-          if (this.projData.visual === 'lightning') {
-              game.effects.push(new LightningEffect(this.x, this.y - 20, this.target.x, this.target.y));
-          }
+    if (this.projData.type === "instant") {
+      this.target.takeDamage(this.dmg);
+      if (this.projData.visual === "lightning") {
+        game.effects.push(
+          new LightningEffect(this.x, this.y - 20, this.target.x, this.target.y)
+        );
       }
-      // 2. NORMAL PROJECTILE (King/Princess)
-      else {
-          game.projectiles.push(new Projectile(
-              spawnX, spawnY, this.target, this.dmg, this.team, 
-              true, // isTower
-              false, false, 0, 2, false, 0, 0,
-              this.projData.type || 'normal',
-              this.projData.speed || 7
-          ));
-      }
+    } else {
+      game.projectiles.push(
+        new Projectile(
+          spawnX,
+          spawnY,
+          this.target,
+          this.dmg,
+          this.team,
+          true,
+          false,
+          false,
+          0,
+          2,
+          false,
+          0,
+          0,
+          this.projData.type || "normal",
+          this.projData.speed || 7
+        )
+      );
+    }
   }
 }

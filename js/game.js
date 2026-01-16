@@ -20,16 +20,23 @@ class GameEngine {
     this.spellAreas = [];
     this.elixir = 5;
     this.botElixir = 5;
+
     this.gameOver = false;
     this.scale = 1;
-    this.matchTime = 180;
-    this.isOvertime = false;
-    this.elixirRate = 1;
-    this.tiebreaker = false;
     this.frameCount = 0;
     this.selectedCardIdx = -1;
     this.mouseX = 0;
     this.mouseY = 0;
+
+    // --- GAME STATES ---
+    this.matchTimer = 180; // 3 Menit Normal
+    this.isOvertime = false;
+    this.isSuddenDeath = false; // Penanda mode Sudden Death
+    this.tiebreaker = false;
+    this.elixirRate = 1;
+
+    // Snapshot untuk Sudden Death (Jumlah tower awal OT)
+    this.startOTTowerCount = { 0: 3, 1: 3 };
   }
 
   startBattle(deck) {
@@ -169,8 +176,9 @@ class GameEngine {
       }
 
       for (let i = 0; i < count; i++) {
-        let ox = 0, oy = 0;
-        
+        let ox = 0,
+          oy = 0;
+
         // Formasi Group Spawn
         if (count > 1) {
           if (count > 4) {
@@ -189,19 +197,19 @@ class GameEngine {
         // Unit baru yang mengalah (terdorong) jika diletakkan di atas unit/bangunan/tower lain
         const obstacles = [...this.units, ...this.buildings, ...this.towers];
         for (let other of obstacles) {
-            if (other.dead) continue;
-            
-            // Hitung jarak
-            const dist = Math.hypot(spawnX - other.x, spawnY - other.y);
-            const minDist = (other.radius || 20) + 15; // 15 estimasi radius unit baru
+          if (other.dead) continue;
 
-            if (dist < minDist) {
-                // Dorong spawn point keluar
-                const angle = Math.atan2(spawnY - other.y, spawnX - other.x);
-                const push = minDist - dist + 2; // +2 biar ada gap dikit
-                spawnX += Math.cos(angle) * push;
-                spawnY += Math.sin(angle) * push;
-            }
+          // Hitung jarak
+          const dist = Math.hypot(spawnX - other.x, spawnY - other.y);
+          const minDist = (other.radius || 20) + 15; // 15 estimasi radius unit baru
+
+          if (dist < minDist) {
+            // Dorong spawn point keluar
+            const angle = Math.atan2(spawnY - other.y, spawnX - other.x);
+            const push = minDist - dist + 2; // +2 biar ada gap dikit
+            spawnX += Math.cos(angle) * push;
+            spawnY += Math.sin(angle) * push;
+          }
         }
         // ---------------------------------------------
 
@@ -209,8 +217,7 @@ class GameEngine {
         if (team !== 0) u.deployTimer = 0;
         this.units.push(u);
       }
-    } 
-    else if (cardData.type === "building") {
+    } else if (cardData.type === "building") {
       const b = new Building(x, y, team, key);
       if (team !== 0) b.deployTimer = 0;
       this.buildings.push(b);
@@ -309,10 +316,15 @@ class GameEngine {
 
     const stats = cardData.stats;
     const radius = spell.radius; // from Spell Object
-    
+
     // OVERRIDE CHECK (From Death Effect)
     const dmg = spell.overrideDmg || stats.dmg || 0;
-    const duration = spell.overrideDuration || stats.duration || stats.rageDuration || stats.stunDuration || 0;
+    const duration =
+      spell.overrideDuration ||
+      stats.duration ||
+      stats.rageDuration ||
+      stats.stunDuration ||
+      0;
 
     // Unit Spawners (Barrel / Miner)
     if (key === "goblin_barrel") {
@@ -363,21 +375,37 @@ class GameEngine {
 
     // Persistent Area Spells
     if (key === "earthquake") {
-      this.spellAreas.push(new SpellArea(x, y, radius, "earthquake", duration || 3, team, dmg));
+      this.spellAreas.push(
+        new SpellArea(x, y, radius, "earthquake", duration || 3, team, dmg)
+      );
       return;
     }
     if (key === "void") {
-      this.spellAreas.push(new SpellArea(x, y, radius, "void", duration || 2, team, dmg));
+      this.spellAreas.push(
+        new SpellArea(x, y, radius, "void", duration || 2, team, dmg)
+      );
       return;
     }
     if (key === "rage") {
-        this.spellAreas.push(new SpellArea(x, y, radius, "rage", duration || 6, team, stats.rageBoost));
-        return;
+      this.spellAreas.push(
+        new SpellArea(
+          x,
+          y,
+          radius,
+          "rage",
+          duration || 6,
+          team,
+          stats.rageBoost
+        )
+      );
+      return;
     }
     if (key === "freeze") {
-        this.spellAreas.push(new SpellArea(x, y, radius, "freeze_visual", duration || 4, team));
-        this.dealAreaDamage(x, y, radius, 0, team, "freeze");
-        return;
+      this.spellAreas.push(
+        new SpellArea(x, y, radius, "freeze_visual", duration || 4, team)
+      );
+      this.dealAreaDamage(x, y, radius, 0, team, "freeze");
+      return;
     }
 
     // Instant Damage / Effect Spells
@@ -487,36 +515,79 @@ class GameEngine {
     CANVAS.addEventListener("touchstart", tap, { passive: false });
   }
 
+  // DALAM GAME.JS - CLASS GameEngine
+
   loop() {
     if (this.gameOver) return;
     this.frameCount++;
+
+    // --- 1. TIMER & GAME STATES LOGIC ---
     if (this.frameCount % 60 === 0) {
-      if (this.matchTime > 0) this.matchTime--;
-      else {
-        if (!this.isOvertime) {
+      // Setiap 1 detik
+
+      // A. Countdown Timer
+      if (this.matchTimer > 0) {
+        this.matchTimer--;
+      }
+
+      // B. Last Minute (Double Elixir)
+      if (!this.isOvertime && this.matchTimer === 60) {
+        this.elixirRate = 2;
+        this.showGameMessage("LAST 60 SECONDS! (2x Elixir)");
+      }
+
+      // C. Waktu Habis (Normal Time -> Overtime)
+      if (this.matchTimer <= 0 && !this.isOvertime) {
+        const pTowers = this.towers.filter(
+          (t) => t.team === 0 && !t.dead
+        ).length;
+        const eTowers = this.towers.filter(
+          (t) => t.team === 1 && !t.dead
+        ).length;
+
+        if (pTowers !== eTowers) {
+          // Jika skor beda, game selesai
+          this.checkWinCondition(true);
+        } else {
+          // Skor seri -> Masuk SUDDEN DEATH
           this.isOvertime = true;
-          this.matchTime = 120;
-          this.elixirRate = 2;
-        } else if (!this.tiebreaker) {
-          this.tiebreaker = true;
-          document.getElementById("tiebreaker-msg").style.display = "block";
+          this.isSuddenDeath = true;
+          this.matchTimer = 120; // Tambah 2 menit (atau 3)
+          this.elixirRate = 3; // Biasanya jadi 3x di late game (opsional, kita set 2x atau 3x)
+
+          // Simpan jumlah tower saat mulai OT untuk referensi Sudden Death
+          this.startOTTowerCount[0] = pTowers;
+          this.startOTTowerCount[1] = eTowers;
+
+          this.showGameMessage("SUDDEN DEATH!");
+          document.getElementById("timer-box").classList.add("overtime");
         }
       }
-      if (!this.isOvertime && this.matchTime <= 60) this.elixirRate = 2;
-      const mins = Math.floor(this.matchTime / 60);
-      const secs = this.matchTime % 60;
-      const tb = document.getElementById("timer-box");
-      if (tb) {
-        tb.innerText = `${mins}:${secs < 10 ? "0" + secs : secs}`;
-        if (this.isOvertime) tb.classList.add("overtime");
+
+      // D. Waktu Habis (Overtime -> Tiebreaker)
+      else if (this.matchTimer <= 0 && this.isOvertime && !this.tiebreaker) {
+        this.tiebreaker = true;
+        this.showGameMessage("TIEBREAKER! (Tower Decay)");
       }
-      if (this.elixirRate === 2)
-        document.getElementById("elixir-rate").style.display = "block";
+
+      // Update UI Timer
+      const mins = Math.floor(this.matchTimer / 60);
+      const secs = this.matchTimer % 60;
+      const tb = document.getElementById("timer-box");
+      if (tb) tb.innerText = `${mins}:${secs < 10 ? "0" + secs : secs}`;
     }
 
-    if (this.tiebreaker && this.frameCount % 30 === 0)
-      this.towers.forEach((t) => t.takeDamage(50));
+    // --- 2. TIEBREAKER MECHANIC (Rapid Decay) ---
+    if (this.tiebreaker) {
+      // Kurangi HP Tower drastis setiap 0.5 detik
+      if (this.frameCount % 30 === 0) {
+        this.towers.forEach((t) => {
+          if (!t.dead) t.takeDamage(70); // Damage cukup besar agar cepat selesai
+        });
+      }
+    }
 
+    // --- 3. RESOURCES ---
     const eRate = CONFIG.baseElixirRate * this.elixirRate;
     if (this.elixir < CONFIG.maxElixir) {
       this.elixir += 0.016 * eRate;
@@ -526,6 +597,7 @@ class GameEngine {
     const bel = document.getElementById("bot-elixir-value");
     if (bel) bel.innerText = Math.floor(this.botElixir);
 
+    // --- 4. GAMEPLAY UPDATES ---
     this.botPlay();
 
     [...this.units, ...this.towers, ...this.buildings].forEach((e) =>
@@ -536,20 +608,114 @@ class GameEngine {
     this.spellAreas.forEach((s) => s.update(this));
     this.updatePendingSpells();
 
+    // Cleanup Dead Entities
     this.units = this.units.filter((u) => !u.dead);
     this.buildings = this.buildings.filter((b) => !b.dead);
+    // Tower jangan diremove dari array biar kita bisa cek HP/Statusnya, cuma visualnya mungkin berubah
+    // TAPI untuk logika saat ini, filter dead tower gapapa asalkan Win Condition dicek benar
     this.towers = this.towers.filter((t) => !t.dead);
     this.projectiles = this.projectiles.filter((p) => !p.dead);
     this.effects = this.effects.filter((e) => e.life > 0);
     this.spellAreas = this.spellAreas.filter((s) => !s.dead);
 
-    const pk = this.towers.find((t) => t.team === 0 && t.type === "king");
-    const ek = this.towers.find((t) => t.team === 1 && t.type === "king");
-    if (!pk) this.endGame("ENEMY WINS");
-    else if (!ek) this.endGame("YOU WIN");
+    // --- 5. CHECK WIN CONDITION ---
+    this.checkWinCondition(false);
 
     this.renderer.renderGame(this);
     requestAnimationFrame(this.loop);
+  }
+
+  // DALAM GAME.JS - CLASS GameEngine
+
+  checkWinCondition(forceEnd = false) {
+    if (this.gameOver) return;
+
+    // 1. Cek King Tower (Instant Win/Loss Kapanpun)
+    const pKing = this.towers.find((t) => t.team === 0 && t.type === "king");
+    const eKing = this.towers.find((t) => t.team === 1 && t.type === "king");
+
+    if (!pKing) {
+      this.endGame("ENEMY WINS!");
+      return;
+    }
+    if (!eKing) {
+      this.endGame("YOU WIN!");
+      return;
+    }
+
+    // 2. Cek Sudden Death (First Tower Falls)
+    if (this.isSuddenDeath && !this.tiebreaker) {
+      const pCount = this.towers.filter((t) => t.team === 0).length;
+      const eCount = this.towers.filter((t) => t.team === 1).length;
+
+      // Jika jumlah tower berkurang dari saat mulai OT -> Yang berkurang KALAH
+      if (pCount < this.startOTTowerCount[0]) {
+        this.endGame("ENEMY WINS! (Sudden Death)");
+        return;
+      }
+      if (eCount < this.startOTTowerCount[1]) {
+        this.endGame("YOU WIN! (Sudden Death)");
+        return;
+      }
+    }
+
+    // 3. Force End (Time Limit / Tiebreaker Finish)
+    if (forceEnd || (this.tiebreaker && (pKing.hp <= 0 || eKing.hp <= 0))) {
+      // Bandingkan HP King jika waktu habis total atau salah satu mati di tiebreaker
+      // (Sebenarnya Tiebreaker Clash Royale membandingkan HP terendah dari *semua* tower,
+      //  tapi membandingkan sisa tower/HP king cukup untuk kloningan ini)
+
+      const pCount = this.towers.filter((t) => t.team === 0).length;
+      const eCount = this.towers.filter((t) => t.team === 1).length;
+
+      if (pCount > eCount) this.endGame("YOU WIN!");
+      else if (eCount > pCount) this.endGame("ENEMY WINS!");
+      else {
+        // Tower sama, cek total HP atau HP King
+        if (pKing.hp > eKing.hp) this.endGame("YOU WIN! (HP Advantage)");
+        else if (eKing.hp > pKing.hp)
+          this.endGame("ENEMY WINS! (HP Advantage)");
+        else this.endGame("DRAW!");
+      }
+    }
+  }
+
+  showGameMessage(text) {
+    // Helper sederhana untuk menampilkan teks overlay sementara
+    // Pastikan ada elemen div dengan id 'game-message' di HTML atau buat dinamis
+    let msgEl = document.getElementById("game-msg-overlay");
+    if (!msgEl) {
+      msgEl = document.createElement("div");
+      msgEl.id = "game-msg-overlay";
+      msgEl.style.position = "absolute";
+      msgEl.style.top = "20%";
+      msgEl.style.width = "100%";
+      msgEl.style.textAlign = "center";
+      msgEl.style.color = "#fff";
+      msgEl.style.fontSize = "32px";
+      msgEl.style.fontWeight = "bold";
+      msgEl.style.textShadow = "2px 2px 0 #000";
+      msgEl.style.pointerEvents = "none";
+      msgEl.style.zIndex = "100";
+      msgEl.style.animation = "fadeOut 3s forwards"; // Asumsi ada keyframe fadeOut
+
+      // Inject style keyframe jika belum ada (hacky way)
+      if (!document.getElementById("msg-style")) {
+        const style = document.createElement("style");
+        style.id = "msg-style";
+        style.innerHTML = `@keyframes fadeOut { 0% {opacity:1; transform:scale(1.5);} 20% {transform:scale(1);} 80% {opacity:1;} 100% {opacity:0;} }`;
+        document.head.appendChild(style);
+      }
+
+      document.getElementById("game-viewport").appendChild(msgEl);
+    }
+
+    msgEl.innerText = text;
+
+    // Reset animasi
+    msgEl.style.animation = "none";
+    msgEl.offsetHeight; /* trigger reflow */
+    msgEl.style.animation = "fadeOut 3s forwards";
   }
 }
 
